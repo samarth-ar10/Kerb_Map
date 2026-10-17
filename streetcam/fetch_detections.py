@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""List neighborhood_cam-1 from the retrieval explore API and save each
-segment's /videos/detections JSON. Token and backend come from files written
-by the login step. This script never prints them.
+"""Save each segment's /videos/detections JSON for one street camera.
+
+Token and backend come from files written by the login step. This script never
+prints them. The default camera is neighborhood_cam-1, written under
+~/kerb-work/dets/<day> so the existing cache stays put. Other cameras go under
+~/kerb-work/dets/<camera_id>/<day>.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import urllib.error
@@ -14,7 +18,7 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-CAMERA = "neighborhood_cam-1"
+DEFAULT_CAMERA = "neighborhood_cam-1"
 
 
 def load_auth():
@@ -24,30 +28,46 @@ def load_auth():
     return backend, token
 
 
-def explore_neighborhood():
+def explore_camera(camera: str):
     rows = json.loads((Path.home() / "kerb-work" / "explore.json").read_text())
-    nb = [r for r in rows if r.get("camera_id") == CAMERA]
-    def sort_key(r):
-        name = r.get("filename") or ""
-        # capture day is the token before _chunk_, upload stamp is the prefix
-        return name
-    nb.sort(key=sort_key)
-    return nb
+    chosen = [r for r in rows if r.get("camera_id") == camera]
+    chosen.sort(key=lambda r: r.get("filename") or "")
+    if not chosen:
+        raise SystemExit(f"no explore rows for {camera}")
+    return chosen
 
 
-def capture_day(filename: str) -> str:
-    # 20261001_072331_neighborhood_20260901_chunk_0000.mp4
-    marker = "neighborhood_"
-    i = filename.find(marker)
-    if i < 0:
-        raise SystemExit(f"cannot read capture day from {filename}")
-    return filename[i + len(marker) : i + len(marker) + 8]
+def capture_day(camera: str, filename: str) -> str:
+    """Day key used to split a camera into tracker runs.
+
+    neighborhood_cam-1 stores the capture date after 'neighborhood_'.
+    sf_streets_cam-5 filenames are <uploaddate>_<time>_sf5_chunk_NNNN and have
+    no second date, so every chunk shares the date prefix.
+    nyc_streets_cam-1 repeats chunk numbers across two VID_YYYYMMDD_HHMMSS clips.
+    """
+    if camera == "neighborhood_cam-1":
+        marker = "neighborhood_"
+        i = filename.find(marker)
+        if i < 0:
+            raise SystemExit(f"cannot read capture day from {filename}")
+        return filename[i + len(marker) : i + len(marker) + 8]
+    if camera == "sf_streets_cam-5":
+        # 20261006_123546_sf5_chunk_0000.mp4
+        return filename[:8]
+    if camera == "nyc_streets_cam-1":
+        marker = "VID_"
+        i = filename.find(marker)
+        if i < 0:
+            raise SystemExit(f"cannot read VID time from {filename}")
+        # VID_20261006_171812_002
+        return filename[i + 4 : i + 19]
+    raise SystemExit(f"no day rule for {camera}")
 
 
-def build_indexes(rows):
+def build_indexes(camera: str, rows):
     days = {}
     for row in rows:
-        day = capture_day(row["filename"])
+        day = capture_day(camera, row["filename"])
         days.setdefault(day, []).append(row)
     indexes = {}
     for day, chunks in days.items():
@@ -82,7 +102,7 @@ def build_indexes(rows):
                 }
             )
         indexes[day] = {
-            "camera_id": CAMERA,
+            "camera_id": camera,
             "day": day,
             "n_chunks": len(out_chunks),
             "chunks": out_chunks,
@@ -96,21 +116,39 @@ def fetch_one(backend, token, source, dest: Path):
     q = urllib.parse.urlencode({"source": source})
     url = f"{backend}/api/v1/videos/detections?{q}"
     req = urllib.request.Request(url, headers={"Authorization": "Bearer " + token})
-    try:
-        with urllib.request.urlopen(req, timeout=180) as resp:
-            body = resp.read()
-    except urllib.error.HTTPError as exc:
-        detail = exc.read(200)
-        return dest.name, f"http_{exc.code}", detail.decode("utf-8", "replace")[:80]
-    dest.write_bytes(body)
-    return dest.name, "ok", len(body)
+    last = "error"
+    for attempt in range(5):
+        try:
+            with urllib.request.urlopen(req, timeout=45) as resp:
+                body = resp.read()
+            dest.write_bytes(body)
+            return dest.name, "ok", len(body)
+        except urllib.error.HTTPError as exc:
+            detail = exc.read(120).decode("utf-8", "replace")
+            last = f"http_{exc.code}"
+            if exc.code not in (429, 500, 502, 503, 504):
+                return dest.name, last, detail[:80]
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            last = type(exc).__name__
+        if attempt < 4:
+            import time
+            time.sleep(2 * (attempt + 1))
+    return dest.name, last, "retries_exhausted"
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--camera", default=DEFAULT_CAMERA)
+    parser.add_argument("--det-root", type=Path, default=None)
+    args = parser.parse_args()
+    camera = args.camera
     backend, token = load_auth()
-    rows = explore_neighborhood()
-    indexes = build_indexes(rows)
-    root = Path(os.environ.get("DET_ROOT", str(Path.home() / "kerb-work" / "dets")))
+    rows = explore_camera(camera)
+    indexes = build_indexes(camera, rows)
+    default_root = Path.home() / "kerb-work" / "dets"
+    if camera != DEFAULT_CAMERA:
+        default_root = default_root / camera
+    root = Path(args.det_root or os.environ.get("DET_ROOT") or default_root)
     jobs = []
     for day, index in indexes.items():
         day_dir = root / day
@@ -121,7 +159,7 @@ def main():
                 jobs.append((seg["source"], day_dir / seg["file"]))
     ok = cached = failed = 0
     failures = []
-    with ThreadPoolExecutor(max_workers=8) as pool:
+    with ThreadPoolExecutor(max_workers=3) as pool:
         futs = [pool.submit(fetch_one, backend, token, src, dest) for src, dest in jobs]
         for fut in as_completed(futs):
             name, status, extra = fut.result()
@@ -133,7 +171,7 @@ def main():
                 failed += 1
                 failures.append({"file": name, "status": status, "extra": extra})
     report = {
-        "camera_id": CAMERA,
+        "camera_id": camera,
         "days": {d: idx["n_chunks"] for d, idx in indexes.items()},
         "n_segments": len(jobs),
         "downloaded": ok,
