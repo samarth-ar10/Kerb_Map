@@ -21,15 +21,19 @@ from pathlib import Path
 DEFAULT_CAMERA = "neighborhood_cam-1"
 
 
+def work_dir() -> Path:
+    return Path(os.environ.get("KERB_WORK") or (Path.home() / "kerb-work"))
+
+
 def load_auth():
-    home = Path.home() / "kerb-work"
-    backend = (home / "backend").read_text().strip().rstrip("/")
-    token = (home / "token").read_text().strip()
+    """Backend URL and token files: KERB_BACKEND_FILE / KERB_TOKEN_FILE, else KERB_WORK/backend, KERB_WORK/token."""
+    backend = Path(os.environ.get("KERB_BACKEND_FILE") or (work_dir() / "backend")).read_text().strip().rstrip("/")
+    token = Path(os.environ.get("KERB_TOKEN_FILE") or (work_dir() / "token")).read_text().strip()
     return backend, token
 
 
 def explore_camera(camera: str):
-    rows = json.loads((Path.home() / "kerb-work" / "explore.json").read_text())
+    rows = json.loads(Path(os.environ.get("KERB_EXPLORE") or (work_dir() / "explore.json")).read_text())
     chosen = [r for r in rows if r.get("camera_id") == camera]
     chosen.sort(key=lambda r: r.get("filename") or "")
     if not chosen:
@@ -145,7 +149,7 @@ def main():
     backend, token = load_auth()
     rows = explore_camera(camera)
     indexes = build_indexes(camera, rows)
-    default_root = Path.home() / "kerb-work" / "dets"
+    default_root = work_dir() / "dets"
     if camera != DEFAULT_CAMERA:
         default_root = default_root / camera
     root = Path(args.det_root or os.environ.get("DET_ROOT") or default_root)

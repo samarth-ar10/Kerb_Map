@@ -8,49 +8,39 @@
     "width": 1920,
     "height": 1080
   },
-  "notes": "Polygons are in detection pixels (1920x1080) on chunk 0000 segment 4 at 1.0 s. The right strip sits under the two cars parked along the right curb. The left strip is the uphill curb on the camera-left side of that street. Legality is unknown: no parking regulation was checked. The lane is the intersection and the travel lanes.",
+  "notes": "Redrawn 2026-10-17 from the image geometry (gridded zoom of frame_sf.jpg and three frames at 16 s, 301 s, 751 s). right: the parking lane along the right curb of Broadway. The kerb-side car's box bottom (grey SUV, x 1480-1760, bottom y 656 at x 1566) sets the line; it runs parallel to the double yellow centre line (slope 40 px over 469 px). Strip from 18 px behind to 18 px in front of that line, about half a car width (the car one lane out, black sedan, has its bottom 33 px lower at x 1770). The old strip ran 30 px further out and reached the next travel lane, and its top edge was below the kerb-side car's bottom. left: removed. The old left strip covered the corner footway with the no-left-turn sign and the crosswalk; the curb lane of Columbus behind it is the stop-line approach (cars queue there at the red light), so there is no kerb-side parking strip on that side in view. Legality is unknown: no parking regulation was checked. Occupancy is position-based (parked.py).",
   "kerb_strips": [
     {
       "id": "right",
       "polygon": [
         [
           1450,
-          635
+          624
         ],
         [
           1919,
-          675
+          664
         ],
         [
           1919,
-          730
+          700
         ],
         [
           1450,
-          690
-        ]
-      ]
-    },
-    {
-      "id": "left",
-      "polygon": [
-        [
-          200,
-          600
-        ],
-        [
-          430,
-          555
-        ],
-        [
-          470,
-          610
-        ],
-        [
-          240,
           660
         ]
-      ]
+      ],
+      "centerline": [
+        [
+          1450,
+          642
+        ],
+        [
+          1919,
+          682
+        ]
+      ],
+      "px_per_m": 61.67
     }
   ],
   "legal_stretches": [
@@ -61,30 +51,14 @@
       "centerline": [
         [
           1450,
-          662
+          642
         ],
         [
           1919,
-          702
+          682
         ]
       ],
       "px_per_m": 61.67
-    },
-    {
-      "id": "left_curb",
-      "kerb_id": "left",
-      "legal": "unknown",
-      "centerline": [
-        [
-          220,
-          630
-        ],
-        [
-          450,
-          582
-        ]
-      ],
-      "px_per_m": 28.8
     }
   ],
   "driveways": [],
@@ -139,5 +113,19 @@
       "px_per_m": 28.8,
       "used_for": "far-field scale for the left strip; the bus is not side-on, so this scale is coarse"
     }
-  ]
+  ],
+  "occupancy": {
+    "cell_m": 1.0,
+    "window_s": 120,
+    "min_fraction": 0.6,
+    "stitch_gap_s": 3.0,
+    "stitch_px": 30,
+    "parked_overlap_s": 120,
+    "vehicle_labels": [
+      "car",
+      "truck",
+      "bus",
+      "motorcycle"
+    ]
+  }
 }
