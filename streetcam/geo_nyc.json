@@ -1,0 +1,23 @@
+{
+  "camera_id": "nyc_streets_cam-1",
+  "frame": "streetcam/frame_nyc.jpg",
+  "origin": {"lat": 40.7186389, "lon": -74.0025285, "osm_node": "42428428", "what": "Broadway and Walker Street signal node"},
+  "csv_landmark": {"lat": 40.71878, "lon": -74.00255, "what": "video_geo.csv point, next to 401 Broadway"},
+  "fit": [
+    {"id": "sw_kerb", "osm_node": "8304498323", "what": "south-west kerb corner of the junction, left end of the near zebra", "u": 220, "v": 760, "lat": 40.7186258, "lon": -74.0026757},
+    {"id": "se_kerb", "osm_node": "8307641753", "what": "south-east kerb corner, right end of the near zebra", "u": 1500, "v": 820, "lat": 40.7185508, "lon": -74.0024913},
+    {"id": "nw_kerb", "osm_node": "8307641755", "what": "north-west kerb corner, sidewalk in front of 401 Broadway", "u": 350, "v": 560, "lat": 40.7187239, "lon": -74.0025993},
+    {"id": "ne_kerb", "osm_node": "8307641756", "what": "north-east kerb corner, by the Walker St pole", "u": 1480, "v": 640, "lat": 40.7186334, "lon": -74.0024136}
+  ],
+  "check": [
+    {"id": "south_crossing", "osm_node": "8307641759", "what": "centre of the near zebra, held out of the fit", "u": 700, "v": 800, "lat": 40.7185847, "lon": -74.0025746}
+  ],
+  "stretches": {
+    "right_curb": [[1620, 730], [1919, 770]],
+    "left_curb": [[180, 610], [980, 590]]
+  },
+  "streets": [
+    {"name": "Broadway", "points": [[40.7180338, -74.0030430], [40.7185847, -74.0025746], [40.7186389, -74.0025285], [40.7186746, -74.0024982]]},
+    {"name": "Walker Street", "points": [[40.7186852, -74.0026294], [40.7186389, -74.0025285], [40.7186004, -74.0024447]]}
+  ]
+}

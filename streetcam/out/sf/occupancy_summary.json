@@ -1,0 +1,36 @@
+{
+  "still_s": 120,
+  "free_gap_m": 5.5,
+  "step_s": 10.0,
+  "stretches": {
+    "right_curb": {
+      "length_m": 7.633,
+      "px_per_m": 61.67
+    },
+    "left_curb": {
+      "length_m": 8.158,
+      "px_per_m": 28.8
+    }
+  },
+  "days": {
+    "20261006": {
+      "n_tracks": 6702,
+      "states": {
+        "traffic": 5502,
+        "not_space": 1200
+      },
+      "parked_track_ids": [],
+      "n_timeline_rows": 180,
+      "stretches": {
+        "right_curb": {
+          "length_m": 7.633,
+          "px_per_m": 61.67
+        },
+        "left_curb": {
+          "length_m": 8.158,
+          "px_per_m": 28.8
+        }
+      }
+    }
+  }
+}

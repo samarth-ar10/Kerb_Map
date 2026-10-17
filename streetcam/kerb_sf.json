@@ -1,0 +1,143 @@
+{
+  "camera_id": "sf_streets_cam-5",
+  "frame": {
+    "filename": "20261006_123546_sf5_chunk_0000.mp4",
+    "segment_number": 4,
+    "time_in_segment_s": 1.0,
+    "image": "frame_sf.jpg",
+    "width": 1920,
+    "height": 1080
+  },
+  "notes": "Polygons are in detection pixels (1920x1080) on chunk 0000 segment 4 at 1.0 s. The right strip sits under the two cars parked along the right curb. The left strip is the uphill curb on the camera-left side of that street. Legality is unknown: no parking regulation was checked. The lane is the intersection and the travel lanes.",
+  "kerb_strips": [
+    {
+      "id": "right",
+      "polygon": [
+        [
+          1450,
+          635
+        ],
+        [
+          1919,
+          675
+        ],
+        [
+          1919,
+          730
+        ],
+        [
+          1450,
+          690
+        ]
+      ]
+    },
+    {
+      "id": "left",
+      "polygon": [
+        [
+          200,
+          600
+        ],
+        [
+          430,
+          555
+        ],
+        [
+          470,
+          610
+        ],
+        [
+          240,
+          660
+        ]
+      ]
+    }
+  ],
+  "legal_stretches": [
+    {
+      "id": "right_curb",
+      "kerb_id": "right",
+      "legal": "unknown",
+      "centerline": [
+        [
+          1450,
+          662
+        ],
+        [
+          1919,
+          702
+        ]
+      ],
+      "px_per_m": 61.67
+    },
+    {
+      "id": "left_curb",
+      "kerb_id": "left",
+      "legal": "unknown",
+      "centerline": [
+        [
+          220,
+          630
+        ],
+        [
+          450,
+          582
+        ]
+      ],
+      "px_per_m": 28.8
+    }
+  ],
+  "driveways": [],
+  "lane": {
+    "polygon": [
+      [
+        80,
+        540
+      ],
+      [
+        1450,
+        560
+      ],
+      [
+        1450,
+        760
+      ],
+      [
+        700,
+        1040
+      ],
+      [
+        80,
+        1040
+      ]
+    ]
+  },
+  "free_gap_m": 5.5,
+  "still_s": 120,
+  "references": [
+    {
+      "id": "black_suv_side",
+      "what": "Car box on this frame, side view, x 1623 to 1919",
+      "pixels": 296,
+      "assumed_m": 4.8,
+      "px_per_m": 61.67,
+      "used_for": "along-kerb scale on the right strip"
+    },
+    {
+      "id": "silver_car_side",
+      "what": "Car box just beyond it, x 1480 to 1760",
+      "pixels": 280,
+      "assumed_m": 4.6,
+      "px_per_m": 60.9,
+      "used_for": "check on the right-strip scale; not used for the length"
+    },
+    {
+      "id": "articulated_bus",
+      "what": "Bus box x 867 to 1386, angled across the intersection",
+      "pixels": 519,
+      "assumed_m": 18.0,
+      "px_per_m": 28.8,
+      "used_for": "far-field scale for the left strip; the bus is not side-on, so this scale is coarse"
+    }
+  ]
+}
