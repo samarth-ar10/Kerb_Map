@@ -21,9 +21,10 @@ decision trail. A pin or postcode query returns the receipts nearby.
   0000–0029. Street cameras: `neighborhood_cam-1` (52, two days, day/fog/night), `sf_streets_cam-5`,
   `nyc_streets_cam-1`.
 - Each segment row has location (one word), camera_id, caption, and `detection_sidecar_uri`: YOLO11 boxes for **every
-  frame** (30 fps, 1920×1080, conf ≥ 0.4, no track ids). Read these boxes; don't re-run YOLO.
-- **No GPS or capture clock in the index.** Toronto GPS comes from PIE's own files, mapped per chunk in
-  `data/pie_map.csv` (when added). Without it, write "position uncertain".
+  frame**, conf ≥ 0.4, no track ids. Frame rate and size vary by camera (PIE 30 fps 1920×1080; neighborhood_cam-1 20 fps
+  2048×1154): always read `fps` and frame `shape` from each sidecar. Read these boxes; don't re-run YOLO.
+- **No GPS or capture clock in the index.** Toronto GPS comes from PIE's own files, mapped per chunk and segment in
+  `data/pie_map.csv`, `data/pie_segments.csv` and `data/video_geo.csv` (all segments we use). Without it, write "position uncertain".
 
 ## Rules
 - Never invent numbers, labels or results. Every number shown must come from a file a teammate can re-run.
