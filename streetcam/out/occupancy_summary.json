@@ -1,0 +1,55 @@
+{
+  "still_s": 120,
+  "free_gap_m": 5.5,
+  "step_s": 10.0,
+  "stretches": {
+    "near_between_driveways": {
+      "length_m": 5.157,
+      "px_per_m": 59.375
+    },
+    "far_curb": {
+      "length_m": 21.907,
+      "px_per_m": 27.13
+    }
+  },
+  "days": {
+    "20260901": {
+      "n_tracks": 156,
+      "states": {
+        "not_space": 97,
+        "traffic": 59
+      },
+      "parked_track_ids": [],
+      "n_timeline_rows": 180,
+      "stretches": {
+        "near_between_driveways": {
+          "length_m": 5.157,
+          "px_per_m": 59.375
+        },
+        "far_curb": {
+          "length_m": 21.907,
+          "px_per_m": 27.13
+        }
+      }
+    },
+    "20260902": {
+      "n_tracks": 372,
+      "states": {
+        "traffic": 97,
+        "not_space": 275
+      },
+      "parked_track_ids": [],
+      "n_timeline_rows": 128,
+      "stretches": {
+        "near_between_driveways": {
+          "length_m": 5.157,
+          "px_per_m": 59.375
+        },
+        "far_curb": {
+          "length_m": 21.907,
+          "px_per_m": 27.13
+        }
+      }
+    }
+  }
+}
