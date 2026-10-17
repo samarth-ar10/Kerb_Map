@@ -55,6 +55,8 @@ On a lab VM, credentials stay in `/config/<team>.config`. GitHub’s port 22 is 
 KERB_DB=vastdb python -m query.api
 ```
 
+Pitch: [pitch/](pitch/README.md) (2-minute slides, PDF and a 30-second product demo video).
+
 Deploy: [query/DEPLOY.md](query/DEPLOY.md). Upload demo: [query/DEMO_UPLOAD.md](query/DEMO_UPLOAD.md). VastDB and Cosmos Embed1 check: [query/SMOKE_TEST.md](query/SMOKE_TEST.md). `kerbmap-app` is already on the cluster.
 
 `streetcam/apply_geo.py` rewrites the spaces file you pass it and appends a `position` trail step on every run. The copies in `streetcam/out/` already have that step.
@@ -68,7 +70,7 @@ Counted on the day. The file in the last column is the source.
 | Toronto dashcam | 1,080 segments x 5 s = 1.5 camera-hours, 6 drives | [dashcam/RESULTS.md](dashcam/RESULTS.md) |
 | Frames kept by the distance gate | 2,701 of 162,000 (1.67%) | [dashcam/MEASURED-COST-AND-CANNOT-TELL.md](dashcam/MEASURED-COST-AND-CANNOT-TELL.md) |
 | Dashcam receipts (`dc_`) | 5,110 from 7,846 sightings: 11 free, 1,710 occupied, 44 not a space, 3,345 cannot tell | [dashcam/RESULTS.md](dashcam/RESULTS.md) |
-| Earlier dashcam pipeline (`pr_`) | 5,302 receipts | [dashcam/RESULTS.md](dashcam/RESULTS.md) |
+| Second dashcam pipeline built today (`pr_`, pie-receipts) | 5,302 receipts | [dashcam/RESULTS.md](dashcam/RESULTS.md) |
 | Sightings sent to Cosmos | 4 of 7,846 (0.05%) | [dashcam/MEASURED-COST-AND-CANNOT-TELL.md](dashcam/MEASURED-COST-AND-CANNOT-TELL.md) |
 | Cosmos vs captioning every 5 s segment | 2.67 vs 720 calls per camera-hour (270x fewer). 13.0 s vs 3,510 s of Cosmos time per camera-hour, from 4 uncached calls (4.81–4.99 s) on a team laptop | [dashcam/MEASURED-COST-AND-CANNOT-TELL.md](dashcam/MEASURED-COST-AND-CANNOT-TELL.md) |
 | One 30 s clip to receipts | 0.23 s from stored detections. About 6.4 s if you add detection fetch and one Cosmos call | [dashcam/MEASURED-COST-AND-CANNOT-TELL.md](dashcam/MEASURED-COST-AND-CANNOT-TELL.md) |
@@ -98,7 +100,7 @@ Counted on the day. The file in the last column is the source.
 | Path | What it is |
 |---|---|
 | [`common/`](common/README.md) | Table contract and the only database client. |
-| [`dashcam/`](dashcam/RESULTS.md) | Toronto pipeline (`dc_` ids). `convert_teammate.py` loads the earlier `pr_` run. |
+| [`dashcam/`](dashcam/RESULTS.md) | Toronto pipeline (`dc_` ids). `convert_teammate.py` loads the second pipeline's `pr_` run (built today). |
 | [`streetcam/`](streetcam/PROGRESS.md) | Tracker, parked rule, hand-drawn kerb, homography, receipts. |
 | [`query/`](query/README.md) | API, pages, upload, labelling, MCP tools, agents. |
 | [`weave_eval/`](weave_eval/comparison.md) | Rule variants against the human labels. |
