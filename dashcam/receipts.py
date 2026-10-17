@@ -23,7 +23,7 @@ DET_DIR = DATA / "dashcam-det"
 OSM_DIR = DATA / "dashcam-osm"
 FRAME_DIR = DATA / "dashcam-frames"
 OUT = REPO / "dashcam" / "out"
-WORK = OUT / "work"
+WORK = pathlib.Path(os.environ["KERB_WORK"]) if os.environ.get("KERB_WORK") else OUT / "work"
 COSMOS_URL = os.environ.get("COSMOS_LOCAL_URL", "http://127.0.0.1:8850")
 
 # ---- parameters (all assumptions are listed here and in RESULTS.md) ----
@@ -42,6 +42,11 @@ GAP_CLEAR_MAX = 3.0          # longer gaps are unclear (driveway, no-stopping zo
 CAR_LEN_M = 5.0              # metres per neighbouring-box width, for the length estimate only
 COSMOS_SHARE = 0.05          # at most 5% of slots per drive sent to the model
 COSMOS_MIN_P = 0.85          # below this first-token probability -> cannot_tell
+# Rule change behind a flag (branch dashcam/cannot-tell): a lane-unclear car whose outer edge lines up with the
+# parked row already found on the same side of the same frame (|outer edge - row outer edge| <= ROW_TOL_M) is
+# called parked. Off by default; KERB_ROW_RULE=1 turns it on. Only boxes parked by the base rule define the row.
+ROW_RULE = os.environ.get("KERB_ROW_RULE", "0") == "1"
+ROW_TOL_M = float(os.environ.get("KERB_ROW_TOL_M", "1.0"))
 RULE_RADII = {"junction": 12.0, "driveway": 6.0, "crossing": 10.0, "traffic_signals": 15.0,
               "fire_hydrant": 5.0, "bus_stop": 15.0, "stop": 10.0}
 ROAD = {"motorway", "trunk", "primary", "secondary", "tertiary", "residential", "unclassified", "living_street",
@@ -275,6 +280,15 @@ def classify_boxes(boxes, a, y_h, two_way, multi):
                 o["role"], o["why"] = "parked", f"outermost row, inner edge {o['lat_in_m']} m from our path ({why})"
             else:
                 o["role"], o["why"] = "lane_unclear", f"inner edge {o['lat_in_m']} m from our path, needs >= {need} m ({why})"
+        if ROW_RULE:
+            row = sorted(o["lat_out_m"] for o in cand if o["role"] == "parked")
+            if row:
+                row_out = row[len(row) // 2] if len(row) % 2 else (row[len(row) // 2 - 1] + row[len(row) // 2]) / 2
+                for o in cand:
+                    if o["role"] == "lane_unclear" and abs(o["lat_out_m"] - row_out) <= ROW_TOL_M:
+                        o["role"], o["why"] = "parked", (f"lines up with the parked row on this side (outer edge "
+                                                         f"{o['lat_out_m']} m vs row {round(row_out, 2)} m, tol {ROW_TOL_M} m); "
+                                                         f"base rule said: {o['why']}")
     return out
 
 
