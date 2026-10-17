@@ -1,0 +1,16 @@
+{
+  "slots": 5302,
+  "sent": 24,
+  "share": 0.004527,
+  "spaces_by_set": {
+    "set01": 1257,
+    "set02": 766,
+    "set03": 1057,
+    "set04": 1019,
+    "set05": 372,
+    "set06": 831
+  },
+  "trail_rows": 31812,
+  "incomplete_trails": 0,
+  "vast": "inserted into vss-schema.kerb_spaces and kerb_trail"
+}
