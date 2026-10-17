@@ -47,6 +47,8 @@ python -m pytest -q common/tests query/tests
 KERB_DB=local python -m query.mcp_server          # find_free_space, get_receipt, overrule
 ```
 
+GitHub runs that pytest, a syntax compile of the Python packages, and `query/build_deploy.py` on every push and pull request (`.github/workflows/test.yml`).
+
 On a lab VM, credentials stay in `/config/<team>.config`. GitHub’s port 22 is blocked there; use 443.
 
 ```bash
