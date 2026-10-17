@@ -55,7 +55,6 @@ Still means the box centre stays inside a 25 px square. Track 0002, which does n
 
 No track is parked. The two cars that stay still on 20260901 are in the driveways: 0001 for 631.5 s (left) and 0002 for 900.0 s (right). Track 0022 stays in a 25 px patch for 135.4 s, and its bottom centre is in the lane, so it is traffic. Occupied intervals are empty on both days. `streetcam/out/occupancy_timeline.jsonl` has both stretches at every 10 s, with the free length equal to the whole stretch.
 
-
 ## Occupancy fix (2026-10-17): redrawn areas, position-based occupancy
 
 Why: 40 human labels (batches A3 + A6, `day-of/label-batches/merged_labels.csv`) agreed with the old states on 25. Eight cars parked at the kerb were called traffic (seven "in the lane": the far strip started at x=700, the parked car sits at x 440-760), four moving cars on the bend at the right were outside every polygon, and night detections flicker, so one parked car splits into many short tracks that never pass a per-track 120 s still test.
@@ -101,3 +100,23 @@ Held-out check: batches A1, A2, A4, A5 when returned. Run once after the fix was
 Re-run: `python streetcam/parked.py --kerb streetcam/kerb_neighborhood.json --tracks streetcam/day-20260901/tracks.jsonl streetcam/day-20260902/tracks.jsonl --out streetcam/out/occupancy_timeline.jsonl`
 
 Not done: no kerb strip on the outer curb of the bend at the right (traffic only there in these two days); per-vertex scale rests on an assumed car length.
+
+## SF and NYC tracks, and receipts for three cameras
+
+`common/` is the table contract from `origin/query/main`. Receipts go through `common/kerbdb.py` into a local SQLite file (`KERB_DB=local`) and into `streetcam/out/kerb_spaces.jsonl`, `kerb_observations.jsonl` and `kerb_trail.jsonl`. VastDB was not written: `import vastdb` raises `ModuleNotFoundError`.
+
+`streetcam/fetch_detections.py --camera` saved the stored boxes. SF is one filename sequence, day key `20261006` (the date prefix; there is no second capture-date token): 30 chunks, 180 segments, 0 failures. NYC is two `VID_` clips, 30 chunks each, 360 segments, 0 failures. Both cameras are 30 fps and 1920×1080.
+
+| Camera | Day key | Chunks | Frames | Tracks | Chunks with no tracks | Parked ids |
+|---|---|---|---|---|---|---|
+| sf_streets_cam-5 | 20261006 | 30 | 27000 | 6702 | 0 | none |
+| nyc_streets_cam-1 | 20261006_171812 | 30 | 27000 | 8992 | 0 | none |
+| nyc_streets_cam-1 | 20261006_174811 | 30 | 27000 | 9966 | 0 | none |
+
+From `streetcam/out/sf/occupancy_summary.json`: 5502 traffic, 1200 not_space, parked `[]`. The longest car track in `day-sf-20261006/tracks.jsonl` is `20261006-3729` at 73.4 s, under the 120 s rule. Right curb 7.633 m (61.67 px/m from a 296 px side-view car taken as 4.8 m). Left curb 8.158 m (28.8 px/m from a 519 px bus taken as 18 m; the bus is angled).
+
+From `streetcam/out/nyc/occupancy_summary.json`: clip `20261006_171812` is 6694 traffic and 2298 not_space; clip `20261006_174811` is 7298 traffic and 2668 not_space. Parked ids are empty on both. No car, truck or bus track in either file lasts 90 s. Right curb 5.135 m, left curb 13.621 m, both at 58.75 px/m from a 705 px bus box taken as 12 m (the bus is angled).
+
+Drawings: `streetcam/kerb_sf.json`, `streetcam/kerb_nyc.json`, with `frame_sf.jpg`, `frame_nyc.jpg`, `kerb_sf_overlay.jpg` and `kerb_nyc_overlay.jpg`. Legality on those stretches is unknown, so an empty window is state `free` with reason `legality unknown`. Neighborhood receipt rows follow the occupancy fix above: near stretch 6.172 m, far stretch 17.165 m. A window with parked track ids is `occupied`; an empty neighborhood window is `free` with reason `no parked car on the hand-marked legal stretch`. Of the 308 neighborhood rows, 81 are occupied (17 on 20260901, 64 on 20260902) and 227 are free.
+
+Receipt rows (`streetcam/out/kerb_spaces.jsonl`): neighborhood 308, SF 180, NYC 360, all `source=streetcam`, `side=view`, `position_status=uncertain`. Each row has `original_video`, `segment_number`, `t_sec`, `receipt_text` and a plate-blurred `evidence_uri` (one frame per chunk). Trail steps are `boxes`, `track` and `rule` (2544 rows).
