@@ -1,0 +1,79 @@
+[
+  {
+    "chunk_index": 0,
+    "filename": "20261001_072331_neighborhood_20260901_chunk_0000.mp4",
+    "segment_number": 3,
+    "frame_index": 80,
+    "time_s": 14.0,
+    "time_in_segment_s": 4.0,
+    "det_shape": [
+      1154,
+      2048
+    ],
+    "fps": 20.0,
+    "track_ids": [
+      "20260901-0001",
+      "20260901-0002",
+      "20260901-0003",
+      "20260901-0004"
+    ],
+    "video_wh": [
+      2048,
+      1154
+    ],
+    "panel_wh": [
+      640,
+      360
+    ]
+  },
+  {
+    "chunk_index": 15,
+    "filename": "20261001_072951_neighborhood_20260901_chunk_0015.mp4",
+    "segment_number": 1,
+    "frame_index": 0,
+    "time_s": 450.0,
+    "time_in_segment_s": 0.0,
+    "det_shape": [
+      1154,
+      2048
+    ],
+    "fps": 20.0,
+    "track_ids": [
+      "20260901-0001",
+      "20260901-0002"
+    ],
+    "video_wh": [
+      2048,
+      1154
+    ],
+    "panel_wh": [
+      640,
+      360
+    ]
+  },
+  {
+    "chunk_index": 29,
+    "filename": "20261001_073547_neighborhood_20260901_chunk_0029.mp4",
+    "segment_number": 3,
+    "frame_index": 66,
+    "time_s": 883.3,
+    "time_in_segment_s": 3.3,
+    "det_shape": [
+      1154,
+      2048
+    ],
+    "fps": 20.0,
+    "track_ids": [
+      "20260901-0002",
+      "20260901-0155"
+    ],
+    "video_wh": [
+      2048,
+      1154
+    ],
+    "panel_wh": [
+      640,
+      360
+    ]
+  }
+]
