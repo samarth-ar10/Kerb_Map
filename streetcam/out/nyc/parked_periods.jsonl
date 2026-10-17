@@ -1,0 +1,7 @@
+{"day": "20261006_171812", "kerb_id": "left", "t_start_s": 91.0, "t_end_s": 296.0, "from_m": 15.741, "to_m": 21.644, "n_cells": 6, "period_id": "20261006_171812-P01", "duration_s": 205.0, "long_enough": true}
+{"day": "20261006_171812", "kerb_id": "left", "t_start_s": 390.0, "t_end_s": 853.0, "from_m": 14.757, "to_m": 21.644, "n_cells": 7, "period_id": "20261006_171812-P02", "duration_s": 463.0, "long_enough": true}
+{"day": "20261006_171812", "kerb_id": "right", "t_start_s": 0.0, "t_end_s": 363.0, "from_m": 0.0, "to_m": 5.43, "n_cells": 5, "period_id": "20261006_171812-P03", "duration_s": 363.0, "long_enough": true}
+{"day": "20261006_171812", "kerb_id": "right", "t_start_s": 391.0, "t_end_s": 900.0, "from_m": 1.086, "to_m": 5.43, "n_cells": 4, "period_id": "20261006_171812-P04", "duration_s": 509.0, "long_enough": true}
+{"day": "20261006_174811", "kerb_id": "left", "t_start_s": 0.0, "t_end_s": 235.0, "from_m": 6.887, "to_m": 14.757, "n_cells": 8, "period_id": "20261006_174811-P01", "duration_s": 235.0, "long_enough": true}
+{"day": "20261006_174811", "kerb_id": "left", "t_start_s": 795.0, "t_end_s": 900.0, "from_m": 17.708, "to_m": 19.676, "n_cells": 2, "period_id": "20261006_174811-P02", "duration_s": 105.0, "long_enough": false}
+{"day": "20261006_174811", "kerb_id": "right", "t_start_s": 0.0, "t_end_s": 900.0, "from_m": 0.0, "to_m": 5.43, "n_cells": 5, "period_id": "20261006_174811-P03", "duration_s": 900.0, "long_enough": true}

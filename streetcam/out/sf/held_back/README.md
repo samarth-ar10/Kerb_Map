@@ -1,0 +1,3 @@
+SF (sf_streets_cam-5) receipts held back from `streetcam/out/kerb_*.jsonl` and from the VastDB load.
+
+These 90 spaces / 90 observations / 270 trail rows were written by `write_receipts.py` on 2026-10-17 (state from occupied metres: 35 occupied, 55 free). They failed the frame spot check: of 10 random receipts (made with the earlier track-id state rule), 8 looked implausible, mostly "free" calls with a car standing in the right kerb strip in the evidence frame. Do not load or publish them until the SF strip and occupancy pass a frame check. Load the other cameras with `--cameras neighborhood_cam-1,nyc_streets_cam-1`.
