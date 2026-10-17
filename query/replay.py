@@ -19,6 +19,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from query import store
+from query.drivelog import summarize
 from query.sources import REPO
 from query.timeline import load_chunks
 
@@ -107,6 +108,16 @@ def list_drives():
         out.append({"drive_id": k, "label": f"{k} ({n} receipts)", "clips": len(v), "receipts": n})
     return {"mode": "replay", "note": NOTE, "timeline": os.path.basename(_timeline_path() or "") or None,
             "drives": out}
+
+
+@router.get("/api/drives/{drive_id:path}")
+def drive_log(drive_id: str):
+    """Streets and states this drive's existing receipts already recorded. No writes."""
+    d = drives()
+    if drive_id not in d:
+        raise HTTPException(404, f"unknown drive {drive_id!r}; see api/replay/drives")
+    spaces = store.read_all("kerb_spaces", None, limit=1000000)
+    return summarize(drive_id, d[drive_id], spaces)
 
 
 @router.post("/api/replay/start")

@@ -70,9 +70,10 @@
       if (d.clips != null) bits.push(d.clips + " clips");
       if (d.receipts != null) bits.push(d.receipts + " kerb spots");
       var w = max && d.clips ? Math.max(6, d.clips / max * 100) : 0;
-      return '<li><span class="dicon" aria-hidden="true">▶</span><div class="dmain"><b>' + esc(nice(d.drive_id)) + "</b>" +
+      return '<li><a class="dlink" href="drive.html?id=' + encodeURIComponent(d.drive_id) + '" data-keep>' +
+        '<span class="dicon" aria-hidden="true">▶</span><div class="dmain"><b>' + esc(nice(d.drive_id)) + "</b>" +
         '<span class="dmeta">' + esc(bits.join(" · ") || d.drive_id) + "</span>" +
-        (w ? '<span class="dbar"><i style="width:' + w + '%"></i></span>' : "") + "</div></li>";
+        (w ? '<span class="dbar"><i style="width:' + w + '%"></i></span>' : "") + "</div></a></li>";
     }).join("");
   });
 })();

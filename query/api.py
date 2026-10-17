@@ -23,7 +23,7 @@ from query.sources import REPO, jsonl_dirs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(HERE, "static") if os.path.isdir(os.path.join(HERE, "static")) else HERE
-PAGES = {"index.html", "setup.html", "find.html", "find.js", "explore.html", "label.html", "board.html", "measured.html",
+PAGES = {"index.html", "setup.html", "drive.html", "find.html", "find.js", "explore.html", "label.html", "board.html", "measured.html",
          "app.js", "api.js", "label.js", "style.css"}
 
 app = FastAPI(title="Kerb Map API")
