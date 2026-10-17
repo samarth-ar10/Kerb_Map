@@ -1,70 +1,138 @@
-# On-street parking availability
+# Kerb Map: on-street parking from dashcams, then street cameras
 
-A person enters a postcode or drops a pin. The site reports how many on-street spaces are free on the nearby roads at a chosen time, and when each stretch of kerb was last seen.
+A person drops a pin or enters a postcode. The page shows each stretch of kerb nearby: is it a legal space, is it free or
+occupied, when was it last seen, and the evidence for that answer. Every answer is a **receipt**: the frames, the decision
+trail, and a confidence. "Cannot tell" and "not seen" are honest answers, never hidden.
 
-The footage is the dashcam and CCTV library in the team VSS instance: [team-5-vss dashboard](https://team-5-vss.thecosmoslabs.com/dashboard) (Vast VSS Blueprint, Video Search & Summarization). That catalog is behind login. The first build task is to list every clip, tag it as dashcam or fixed CCTV, and record which road it shows.
+**Order of work today:** first rebuild, on the VAST event stack, the dashcam pipeline we designed and measured before the
+event (phase 1). Then add street cameras (phase 2). Then the postcode/pin query that merges both (phase 3).
+All code in this repo is written today. What we bring from before the event is the plan, the measurements, and the
+lessons below.
 
-## What a space is
+## 1. What we already know (measured before the event)
 
-On-street parking is a length of kerb, not a painted bay. Each road is stored as two lines, one per side. Along each line there are three kinds of interval:
+We rehearsed this on the public Toronto PIE dashcam dataset (85 minutes, 6 drives) with YOLO11, kerb geometry,
+OpenStreetMap rules and NVIDIA Cosmos-Reason1-7B running locally. Labels were frozen before any model answer. A fresh
+held-out set (9 videos never used for tuning) was run once.
 
-- **Legal.** Where a car may stop at that time of day. Double yellows, bus stops, junctions, dropped kerbs, and driveways stay out. Single yellows and permit bays move in and out with the clock.
-- **Seen.** The metres a camera actually had in view. Unseen kerb stays unknown.
-- **Occupied.** The metres where a stationary vehicle is sitting.
+| Measure (fresh held-out) | Result | Target |
+|---|---|---|
+| Is this a real legal kerb space? (precision on answered spots) | 0.84 (38/45) | 0.90 |
+| Free vs occupied, on real spaces answered | 0.895 (34/38) | 0.85 |
+| When it says "free", is it right? | 0.53 (8/15) | 0.80 |
+| Spaces found / free spaces found (recall) | 0.42 / 0.17 | - |
+| "Cannot tell" rate | 4.5% | under 25% |
+| Pin error (median) | about 3 m | under 8 m |
+| Cosmos calls | 2.3% of kerb slots, 76 GPU-s per camera-hour vs 2,600 for captioning everything | - |
 
-A free space is a legal, seen, unoccupied gap of about 5 metres. The number for a road is how many of those gaps fit on each side, plus the time that side was last seen.
+What this tells us:
+- **Occupied is easy, free is hard.** A single dashcam pass finds parked cars well but misses or mislabels free gaps.
+  That is why street cameras matter (phase 2): a fixed view watches the same kerb for minutes.
+- **The false spaces** were driveways (3 of 7), kerbs nobody parks on, a corner, a hydrant.
+- **Cheap first, Cosmos last** works: distance gate, then boxes, then geometry and rules, then Cosmos only on unclear gaps.
 
-A postcode only selects the nearby kerb lines. The page shows the road, the side, the free count, how many metres were visible, and the age of the sighting.
+## 2. Facts about the event data we must design around
 
-## Footage
+- VSS rows store `location` as one word (e.g. `toronto`), no GPS, no road name, no capture clock. Boxes are stored per
+  5 s segment (`detection_sidecar_uri`, YOLO11s, conf >= 0.4, no track ids). Check this first in the clip table.
+- A **postcode or pin needs coordinates.** Dashcam clips only get them if GPS comes with the footage (PIE has it in its own
+  files; ask the organisers if we may use it). A **street camera has one fixed location**, which we can set by hand once.
+- Re-ingest is slow. Start any re-ingest in the first hour, on a small batch. Never make the demo wait on it.
+- Cosmos on the event host is a different model from our rehearsal (`cosmos3` family). Re-check the prompt and the
+  confidence line on a few labelled spots before trusting it.
 
-Both sources write the same record: kerb id, from–to metres, occupied or empty, time, confidence.
+## 3. The data model (one model for every source)
 
-**CCTV** keeps one stretch live. Use it where a fixed camera looks along the kerb.
+Each road side is a kerb line. Along it there are intervals:
+- **Legal:** where a car may stop (no junctions, bus stops, hydrants, crossings, driveways, double yellows).
+- **Seen:** metres a camera actually had in view, with the time.
+- **Occupied / free / cannot tell:** what was there.
 
-1. Survey the camera position.
-2. Project the road surface from image pixels onto that kerb line, once, from camera height, angle, and a few measured points on the street.
-3. Detect vehicles. Keep the ones that stay still in the world for a second or two. Those are parked. Cars moving along the lane are traffic.
-4. Drop each parked car’s footprint onto the kerb as an occupied interval, and mark the visible stretch as seen.
-5. Repeat every few seconds. Store the intervals. Drop the frame.
+A free space is a legal, seen, unoccupied gap of about one car length (5.5 m). Unseen kerb stays **unknown**, which is
+different from **empty**.
 
-One camera covers the near kerb and loses the far end to occlusion and perspective. Plan on one camera per stretch that must stay live.
+Stored in VastDB beside `vss-collection` (same schema):
 
-**Dashcam** records a single pass.
+| Table | One row per |
+|---|---|
+| `kerb_spaces` | kerb stretch: state, side, position or "position uncertain", last seen, confidence |
+| `kerb_observations` | sighting: source (dashcam or street camera), video, segment, time, state |
+| `kerb_trail` | decision step: gate, boxes, geometry, rule, Cosmos word and confidence |
+| `kerb_overrules` | person or agent correction, and which receipts it changed |
+| `kerb_eval_cases` | frozen label, used for measurement |
 
-1. Keep GPS, heading, speed, and time with the video.
-2. Detect parked vehicles and the kerb edge. Keep those detections and the track.
-3. Snap the drive to the road centreline before deciding which side of the street the car was on.
-4. Project each detection onto the left or right kerb. The bottom of the vehicle in the image, on a flat-road assumption, gives the distance.
-5. Write occupied intervals only where the kerb was in frame. A gap counts as free only when the camera saw that kerb and no parked car was there.
+## 4. Phase 1: rebuild the dashcam pipeline on the event stack
 
-The along-street error has to stay inside one car length, about 5 metres. A car on the wrong side, or 10 metres down the road, makes the free count wrong even when the detector is right.
+| # | Step | Done when |
+|---|---|---|
+| 1 | Clip table: every clip, dashcam or street camera, location word, GPS yes/no, duration | table in `data/clips.csv` |
+| 2 | Keyframes: one per ~8 m of travel (distance gate) or one per second without GPS | frames + index written |
+| 3 | Boxes: read the stored YOLO sidecar for the keyframe time (don't re-run YOLO) | boxes for every keyframe |
+| 4 | Kerb slots: parked-car rows along each side, and the gaps between them | slots with left/right side |
+| 5 | Rules: OSM junctions, crossings, hydrants, bus stops; car-length minimum | rejected slots carry a reason |
+| 6 | Cosmos: only on unclear gaps; answer free / occupied / not a space / cannot tell + confidence | under 5% of slots sent |
+| 7 | Position: GPS + offset, snapped to the road; else "position uncertain" | pin or uncertain on every receipt |
+| 8 | Receipts into the five VastDB tables | rows visible in VastDB |
+| 9 | Query: one VastDB filter (state, side) + radius + semantic similarity over the evidence | returns receipts in under 3 s |
+| 10 | Overrule: a person or the agent corrects a receipt; nearby receipts re-run; change visible | before/after shown |
+| 11 | MCP tools `find_free_space`, `get_receipt`, `overrule`, used by a second agent | 5 tasks, incl. an abstention |
+| 12 | Measure: frozen labels (human-checked), dev vs held-out, counts beside every number | results table in README |
 
-A dashcam result expires quickly. On a busy street a space seen five minutes ago is a weak claim. Show it as last-seen, and let a later CCTV view of the same metres replace it.
+## 5. Phase 2: street cameras (fixed CCTV view of a kerb)
 
-## Query
+A fixed camera can watch one stretch continuously, which fixes our weakest number (free spaces).
 
-A newer sighting of the same metres replaces an older one. CCTV keeps refreshing the metres it can see. Dashcams fill roads that have no camera, then go stale.
+1. Pick clips where a fixed camera sees a kerb (the neighbourhood and street cameras in the library).
+2. Draw the kerb once by hand on one frame: the kerb line, legal stretches, and 3 to 4 reference points to map pixels to
+   metres along the kerb.
+3. **Track** cars over time (YOLO11 + tracker for persistent ids). A car that stays still for more than a few seconds,
+   on the kerb strip, is parked. Moving cars are traffic.
+4. Project each parked car's footprint onto the kerb line as an occupied interval. The visible stretch is "seen".
+5. Every few seconds write the intervals. Keep receipts with a frame, not the whole video.
+6. Measure it the same way: label 30 to 50 moments by hand before running, report free precision and recall.
 
-For a postcode at a chosen time:
+One camera covers its near kerb well and loses the far end. Report the covered metres, never more.
 
-- load kerb lines within a short radius
-- apply the parking rules for that clock time
-- subtract occupied intervals that are still fresh
-- count car-length gaps on the seen, legal kerb
-- return, per road side: free count, metres covered, last seen
+## 6. Phase 3: pin / postcode query and merging sources
 
-Until a stretch has been seen, report it as unknown. An empty answer and a “not seen” answer are different.
+- Load kerb lines near the pin, apply rules, keep fresh sightings, count car-length gaps on seen, legal kerb.
+- Newer sighting of the same metres wins. Street cameras refresh their stretch; dashcams fill other roads, then go stale.
+- Answer per road side: free count, metres seen, last seen, and a link to each receipt.
 
-## Build order
+## 7. What we tried before the event that did NOT work (don't repeat)
 
-1. Log in to the VSS dashboard and make a clip table: file, source (dashcam or CCTV), road, time range, whether GPS or a camera position exists.
-2. Hand-draw both kerbs and the restrictions for one street that appears in that table.
-3. Run one dashcam clip of that street and check that each parked car lands on the correct side, within a few metres of where it really is.
-4. Run one CCTV clip of the same kerb and check that its intervals land on the same line.
-5. Publish a page that turns a postcode into a free count, with coverage and last-seen time.
-6. Add more roads only after those two clips agree.
+- Distance from a single frame using a flat-road assumption, or a monocular depth model: too noisy to separate kerb,
+  driveway and lane.
+- Matching cars between keyframes 1 to 2 s apart without a tracker: parked cars looked like they moved.
+- Asking Cosmos "parked or traffic?" on the whole frame: cut recall badly. Ask about one boxed gap instead.
+- A zoomed kerb crop as a second look, "could you park here?", a three-frame clip, OSM driveway distance: no gain.
+- Captions alone for search: "free kerb space" search fails on captions. Filter on the receipt state first.
 
-## Privacy
+What is promising and still open: tracking cars through the video plus road segmentation (road vs sidewalk), which
+street cameras give us almost for free.
 
-Point the processing at bays and kerbs. Occupancy does not need faces or number plates, so do not collect them. Keep raw video only as long as the clip library already does, and store the derived intervals as the product.
+## 8. How we measure (judges ask for this)
+
+- Labels are written and frozen (hash + time) before the model runs on them, checked by a person.
+- Dev and held-out are separate. Held-out is run once and reported as it comes.
+- Every number has its count beside it. "Cannot tell" is reported, not hidden.
+- One decision trail is shown end to end in the demo.
+- One VastDB query combines a filter with semantic search.
+
+## 9. Who does what
+
+| Who | Role |
+|---|---|
+| Cursor agents (use sub-agents) | Phase 1 steps 1 to 11, then phase 2 tracking |
+| Samarth | Bridge to Claude (planning, review, measurements), human label check, demo |
+| Teammate | Clip table and street-camera kerb drawing, facts and sources, README "built today vs brought in", pitch |
+
+## 10. Privacy
+
+Point the processing at kerbs. Occupancy needs no faces or number plates: don't collect them, and don't show plates in
+receipt crops. Store the intervals and receipts; keep raw video only as long as the library already does.
+
+## 11. Credits
+
+PIE dataset (York University, MIT licence), Ultralytics YOLO11 (AGPL-3.0), OpenStreetMap (ODbL), NVIDIA Cosmos models,
+VAST VSS blueprint and the builders-challenge starter kit. Ideas from Ultralytics ParkingManagement and ORB-SLAM keyframing.

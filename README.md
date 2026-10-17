@@ -1,7 +1,7 @@
-# Vast Team 5
+# Vast Team 5: Kerb Map
 
-On-street parking availability from dashcam and CCTV. A postcode or pin returns how many kerb spaces are free nearby at a chosen time, and when that kerb was last seen.
+On-street parking from dashcams first, then street cameras. A pin or postcode returns each nearby stretch of kerb: legal space or not, free or occupied, when it was last seen, and a receipt with the evidence and decision trail.
 
-The plan is in [PLAN.md](PLAN.md).
+The plan is in [PLAN.md](PLAN.md): rebuild our measured dashcam pipeline on the VAST stack, then add street cameras, then the pin/postcode query.
 
 Footage is the team library on the [VSS dashboard](https://team-5-vss.thecosmoslabs.com/dashboard).
