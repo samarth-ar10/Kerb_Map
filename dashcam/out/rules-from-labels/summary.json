@@ -1,0 +1,9 @@
+{
+ "receipts_by_state": {
+  "cannot_tell": 3171,
+  "occupied": 1462,
+  "not_space": 437,
+  "free": 18
+ },
+ "receipts": 5088
+}

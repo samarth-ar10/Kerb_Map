@@ -36,7 +36,7 @@ FOCAL_PX = 1000.0            # assumed focal length (px) for forward distance; o
 MAX_Z_M = 40.0
 EGO_HALF_M = 1.5             # ego travel band half-width ("clearly in our lane")
 EGO_OVERLAP = 0.3            # box covers >= 30% of the ego band at its depth -> traffic
-GAP_MIN_RATIO = 1.1          # gap >= 1.1 x neighbouring parked-box width (~5.5 m) -> candidate space
+GAP_MIN_RATIO = float(os.environ.get("KERB_GAP_MIN_RATIO", "1.1"))  # gap >= this x neighbouring parked-box width -> candidate (flag A)
 GAP_SHORT_RATIO = 0.6        # gaps 0.6-1.1 x are recorded as "shorter than a car length"
 GAP_CLEAR_MAX = 3.0          # longer gaps are unclear (driveway, no-stopping zone, hidden cars?)
 CAR_LEN_M = 5.0              # metres per neighbouring-box width, for the length estimate only
@@ -47,7 +47,26 @@ COSMOS_MIN_P = 0.85          # below this first-token probability -> cannot_tell
 # called parked. Off by default; KERB_ROW_RULE=1 turns it on. Only boxes parked by the base rule define the row.
 ROW_RULE = os.environ.get("KERB_ROW_RULE", "0") == "1"
 ROW_TOL_M = float(os.environ.get("KERB_ROW_TOL_M", "1.0"))
-RULE_RADII = {"junction": 12.0, "driveway": 6.0, "crossing": 10.0, "traffic_signals": 15.0,
+# Label-driven rule flags (day-of/RULES-FROM-LABELS.md), all at the shipped behaviour by default:
+#  A  KERB_GAP_MIN_RATIO         shortest gap (x neighbouring parked-box width) that can be a space; shipped 1.1
+#  B  KERB_DRIVEWAY_R_M / KERB_JUNCTION_R_M   OSM driveway / junction radius; shipped 6 / 12 m
+#     KERB_DRIVEWAY_INSIDE=1     reject for a driveway only when the node falls inside the gap (our side of the road,
+#                                forward distance within the two neighbour cars +- KERB_DRIVEWAY_MARGIN_M)
+#  C  KERB_TRAVEL_ROW=1          on OSM highway=motorway/trunk/primary with no kerb parking tagged on our side, the
+#                                outermost row is traffic: those cars become not_space "travel lane" (no gaps between them)
+#     KERB_TRAVEL_MIN_LANES      with C1, also require OSM lanes >= this (0 = any)
+#     KERB_TRAVEL_NOPARK=1       a lane-unclear car becomes not_space "travel lane" where OSM tags no parking on that side
+DRIVEWAY_INSIDE = os.environ.get("KERB_DRIVEWAY_INSIDE", "0") == "1"
+DRIVEWAY_MARGIN_M = float(os.environ.get("KERB_DRIVEWAY_MARGIN_M", "2.0"))
+TRAVEL_ROW = os.environ.get("KERB_TRAVEL_ROW", "0") == "1"
+TRAVEL_MIN_LANES = int(os.environ.get("KERB_TRAVEL_MIN_LANES", "0"))
+TRAVEL_NOPARK = os.environ.get("KERB_TRAVEL_NOPARK", "0") == "1"
+TRAVEL_HW = {"motorway", "trunk", "primary", "motorway_link", "trunk_link", "primary_link"}
+PARK_YES = {"lane", "street_side", "on_kerb", "half_on_kerb", "shoulder", "yes", "parallel", "diagonal",
+            "perpendicular", "marked", "separate", "inline"}
+PARK_NO = {"no", "no_parking", "no_stopping", "fire_lane"}
+RULE_RADII = {"junction": float(os.environ.get("KERB_JUNCTION_R_M", "12.0")),
+              "driveway": float(os.environ.get("KERB_DRIVEWAY_R_M", "6.0")), "crossing": 10.0, "traffic_signals": 15.0,
               "fire_hydrant": 5.0, "bus_stop": 15.0, "stop": 10.0}
 ROAD = {"motorway", "trunk", "primary", "secondary", "tertiary", "residential", "unclassified", "living_street",
         "motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link"}
@@ -88,6 +107,7 @@ class OSM:
         self.oneway = {}           # street name -> bool
         self.lanes = {}            # street name -> int or None
         self.highway = {}          # street name -> highway class
+        self.ways = []             # (way id, tags, [(lat, lon), ...]) for road ways, used by the flag-C lookups
         p = OSM_DIR / f"{set_name}.json"
         if not p.exists():
             return
@@ -106,6 +126,9 @@ class OSM:
             for n in e.get("nodes", []):
                 use[n].add((kind, e["id"]))
             name = t.get("name")
+            if kind == "road":
+                self.ways.append((e["id"], t, [(nodes[n]["lat"], nodes[n]["lon"]) for n in e.get("nodes", [])
+                                               if n in nodes and "lat" in nodes[n]]))
             if name and kind == "road":
                 votes[name]["oneway"] += 1 if t.get("oneway") in ("yes", "1", "true") else 0
                 votes[name]["n"] += 1
@@ -161,6 +184,42 @@ class OSM:
                     if d <= RULE_RADII[k]:
                         hits.append((k, round(d, 1), oid))
         return sorted(hits, key=lambda h: h[1])
+
+    def way_at(self, lat, lon, heading, max_m=25.0):
+        """Nearest road way to a GPS point: (way_id, tags, same_direction) or None. Planar metres, fine at 25 m."""
+        if lat is None or heading is None:
+            return None
+        kx = 111320.0 * math.cos(math.radians(lat))
+        best = None
+        for wid, t, pts in self.ways:
+            for (a1, o1), (a2, o2) in zip(pts, pts[1:]):
+                x1, y1, x2, y2 = (o1 - lon) * kx, (a1 - lat) * 111320.0, (o2 - lon) * kx, (a2 - lat) * 111320.0
+                if min(abs(x1), abs(x2)) > 300 or min(abs(y1), abs(y2)) > 300:
+                    continue
+                dx, dy = x2 - x1, y2 - y1
+                L2 = dx * dx + dy * dy
+                u = 0.0 if L2 == 0 else max(0.0, min(1.0, -(x1 * dx + y1 * dy) / L2))
+                d = math.hypot(x1 + u * dx, y1 + u * dy)
+                if d <= max_m and (best is None or d < best[0]):
+                    brg = math.degrees(math.atan2(dx, dy)) % 360
+                    best = (d, wid, t, abs((heading - brg + 180) % 360 - 180) < 90)
+        return None if best is None else best[1:]
+
+    @staticmethod
+    def parking_on(tags, side, same_dir):
+        """'yes' / 'no' / None for kerb parking on our L/R side, from parking:* and parking:lane:* tags."""
+        osm_side = ("left" if side == "L" else "right") if same_dir else ("right" if side == "L" else "left")
+        for k in (f"parking:{osm_side}", "parking:both", f"parking:lane:{osm_side}", "parking:lane:both"):
+            v = tags.get(k)
+            if v in PARK_YES:
+                return "yes"
+            if v in PARK_NO:
+                return "no"
+        for k in (f"parking:{osm_side}:restriction", "parking:both:restriction",
+                  f"parking:condition:{osm_side}", "parking:condition:both"):
+            if tags.get(k) in PARK_NO:
+                return "no"
+        return None
 
     def road_profile(self, street):
         """(two_way, multi_lane_my_side, highway class) for the street name; unknown -> conservative guess."""
@@ -244,7 +303,7 @@ def forward_m(y, a, y_h):
     return min(MAX_Z_M, FOCAL_PX * h_cam / max(1.0, (y - y_h)))
 
 
-def classify_boxes(boxes, a, y_h, two_way, multi):
+def classify_boxes(boxes, a, y_h, two_way, multi, lane_info=None):
     """Lane check and kerb rows. Returns list of dicts with side and role (traffic|parked|lane_unclear)."""
     out = []
     for b in boxes:
@@ -289,7 +348,56 @@ def classify_boxes(boxes, a, y_h, two_way, multi):
                         o["role"], o["why"] = "parked", (f"lines up with the parked row on this side (outer edge "
                                                          f"{o['lat_out_m']} m vs row {round(row_out, 2)} m, tol {ROW_TOL_M} m); "
                                                          f"base rule said: {o['why']}")
+        li = (lane_info or {}).get(side)
+        if li:
+            for o in cand:
+                if (TRAVEL_ROW and li["travel_row"] and o["role"] == "parked") or \
+                        (TRAVEL_NOPARK and li["no_parking"] and o["role"] == "lane_unclear"):
+                    o["role"], o["why"] = "travel_lane", f"{li['why']}; base rule said: {o['why']}"
     return out
+
+
+def lane_info_at(osm, lat, lon, heading):
+    """Flag C: per side, is the outermost row a travel lane (major road, no kerb parking tagged) / parking=no?"""
+    w = osm.way_at(lat, lon, heading) if osm.ok and (TRAVEL_ROW or TRAVEL_NOPARK) else None
+    if not w:
+        return None
+    wid, t, same = w
+    hw, lanes = t.get("highway", ""), t.get("lanes", "")
+    out = {}
+    for side in ("L", "R"):
+        park = osm.parking_on(t, side, same)
+        major = hw in TRAVEL_HW and (TRAVEL_MIN_LANES == 0 or (lanes.isdigit() and int(lanes) >= TRAVEL_MIN_LANES))
+        out[side] = {"travel_row": major and park != "yes", "no_parking": park == "no",
+                     "why": (f"OSM way {wid} highway={hw} lanes={lanes or '?'}, kerb parking on this side: "
+                             f"{park or 'not tagged'}")}
+    return out
+
+
+def kf_gps(r, t):
+    la0, lo0, la1, lo1 = (fnum(r[k]) for k in ("lat_start", "lon_start", "lat_end", "lon_end"))
+    if la0 is None or lo0 is None:
+        return None, None, None
+    if la1 is None:
+        la1, lo1 = la0, lo0
+    f = t / 5.0
+    return la0 + (la1 - la0) * f, lo0 + (lo1 - lo0) * f, fnum(r["heading_mean_deg"])
+
+
+def driveway_inside(s, lat_n, lon_n, a, y_h):
+    """Flag B: driveway node on the gap's side of the road and within the gap's forward span (+- margin)."""
+    pd = s.get("pos_detail", {})
+    la, lo, hd = pd.get("gps_lat"), pd.get("gps_lon"), pd.get("heading")
+    if la is None or hd is None:
+        return True   # cannot place it: keep the shipped radius rule
+    north = (lat_n - la) * 111320.0
+    east = (lon_n - lo) * 111320.0 * math.cos(math.radians(la))
+    th = math.radians(hd)
+    Z = north * math.cos(th) + east * math.sin(th)
+    X = -north * math.sin(th) + east * math.cos(th)
+    zs = [forward_m(nb[3], a, y_h) for nb in s["neighbours"]]
+    on_side = (X > 0) == (s["side"] == "R")
+    return on_side and min(zs) - DRIVEWAY_MARGIN_M <= Z <= max(zs) + DRIVEWAY_MARGIN_M
 
 
 def gaps_for_side(objs, side):
@@ -347,7 +455,8 @@ def slots_for_drive(set_name):
             continue
         boxes = [b for b in fr["detections"] if b["label"] in VEHICLES and b["confidence"] >= MIN_CONF]
         two_way, multi, hw = osm.road_profile(r["street_main"])
-        objs = classify_boxes(boxes, a, y_h, two_way, multi)
+        glat, glon, ghd = kf_gps(r, t)
+        objs = classify_boxes(boxes, a, y_h, two_way, multi, lane_info_at(osm, glat, glon, ghd))
         kf = {"set": set_name, "kf_index": idx, "segment_source": src, "chunk": int(r["chunk"]),
               "segment": int(r["segment"]), "t": round(t, 3), "camera_id": r["camera_id"],
               "original_video": r["original_video"], "segment_start_sec": r["segment_start_sec"], "frame_index": fr["frame_index"],
@@ -364,6 +473,11 @@ def slots_for_drive(set_name):
                     slots.append({**kf, "slot_id": f"{base}_{side}{n:02d}", "side": side, "kind": "car", "box": o["bbox"],
                                   "objs": side_objs, "state": "occupied", "reason": "parked car in kerb row: " + o["why"],
                                   "confidence": o["conf"], "decided_by": "geometry", "rule_hits": []})
+                elif o["role"] == "travel_lane":
+                    n += 1
+                    slots.append({**kf, "slot_id": f"{base}_{side}{n:02d}", "side": side, "kind": "car", "box": o["bbox"],
+                                  "objs": side_objs, "state": "not_space", "reason": "travel lane: " + o["why"],
+                                  "confidence": o["conf"], "decided_by": "rule", "rule_hits": []})
                 elif o["role"] == "lane_unclear":
                     n += 1
                     lane_unclear_boxes += 1
@@ -380,7 +494,7 @@ def slots_for_drive(set_name):
                      "neighbour_conf": [nb["conf"] for nb in g["neighbours"]], "objs": side_objs, "rule_hits": [],
                      "decided_by": "geometry", "confidence": None}
                 gx1, gy1, gx2, gy2 = g["box"]
-                blockers = [o for o in objs if o["role"] in ("traffic", "lane_unclear")
+                blockers = [o for o in objs if o["role"] in ("traffic", "lane_unclear", "travel_lane")
                             and min(gx2, o["bbox"][2]) - max(gx1, o["bbox"][0]) > 0.3 * max(1, gx2 - gx1)
                             ]
                 if g["ratio"] < GAP_MIN_RATIO:
@@ -400,6 +514,11 @@ def slots_for_drive(set_name):
         if s["kind"] == "gap" and s["state"] == "candidate":
             hits = osm.near(s["lat"], s["lon"]) if osm.ok else []
             s["rule_hits"] = hits
+            if DRIVEWAY_INSIDE and hits:
+                pts = {p_[3]: p_ for p_ in osm.points if p_[2] == "driveway"}
+                kept = [h for h in hits if h[0] != "driveway" or driveway_inside(s, pts[h[2]][0], pts[h[2]][1], a, y_h)]
+                s["driveway_outside_gap"] = [h for h in hits if h not in kept]
+                hits = kept
             if not osm.ok:
                 s.update(state="cannot_tell", reason="OSM rules unavailable for this drive", decided_by="rule")
             elif hits:
