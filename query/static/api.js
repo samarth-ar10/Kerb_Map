@@ -95,10 +95,10 @@
         await get("api/spaces" + qs({ limit: 1 }), 6000);
         K.mode = "live";
       } catch (e) {
-        await loadPreview();
+        // Never show preview data unless ?preview=1 asked for it: an unreachable API shows nothing.
+        P = { spaces: [], trail: [], cameras: [], coverage: { cameras: [], passes: [] }, measured: null, missing: true };
         K.mode = "preview";
-        K.reason = P.missing ? "API not reachable. Nothing to show until it is back."
-                             : "API not reachable, so preview data is shown. These entries are not results.";
+        K.reason = "API not reachable. Nothing to show until it is back.";
       }
     }
     UI.banner();
@@ -553,7 +553,7 @@
     banner: function () {
       var b = document.getElementById("banner");
       if (!b) return;
-      if (K.isPreview()) { b.hidden = false; b.innerHTML = "<b>Preview data</b><span>" + esc(K.reason) + "</span>"; }
+      if (K.isPreview()) { b.hidden = false; b.innerHTML = "<b>" + (WANT_PREVIEW ? "Preview data" : "Offline") + "</b><span>" + esc(K.reason) + "</span>"; }
       else b.hidden = true;
     },
     keepPreviewInLinks: function () {
@@ -630,8 +630,7 @@
       }
       var inner;
       if (!m) {
-        inner = '<div class="ph"><div>' + (K.isPreview() ? "Preview: no footage loaded" : "No evidence frame") +
-          (uri ? '<span class="mono">' + esc(uri) + "</span>" : "") + "</div></div>";
+        inner = '<div class="ph"><div>' + (K.isPreview() ? "Preview: no footage loaded" : "No evidence frame") + "</div></div>";
       } else if (m.kind === "video") {
         inner = '<video src="' + esc(m.url) + '" muted playsinline preload="auto" disablepictureinpicture></video>';
       } else {
@@ -672,11 +671,107 @@
           g.fillStyle = "#00e5ff"; g.beginPath(); g.arc(px, py, lw, 0, Math.PI * 2); g.fill();
         }
       }
+      // Moving boxes: stored per-frame vehicle boxes for the segment (api/evidence/detections), scaled into the
+      // mark's frame size; the cars flanking the gap (or the marked car) are followed frame to frame by best IoU.
+      var det = null, detTried = false, trackBy = null, rvfc = 0;
+      var detSrc = /^s3:\/\//i.test(uri || "") && mark && mark.box && !K.isPreview() ? uri : null;
+      function loadDet() {
+        if (detTried || !detSrc) return Promise.resolve(det);
+        detTried = true;
+        return get("api/evidence/detections?source=" + encodeURIComponent(detSrc), 15000).then(function (d) {
+          if (d && d.fps && d.frames && d.width && d.height) { det = d; buildTrack(); }
+          return det;
+        }).catch(function () { return null; });
+      }
+      function boxesAt(i) {
+        var raw = det.frames[String(i)];
+        if (!raw) return null;
+        var kx = fs[0] / det.width, ky = fs[1] / det.height;
+        return raw.map(function (b) { return [b[0] * kx, b[1] * ky, b[2] * kx, b[3] * ky]; });
+      }
+      function iou(a, b) {
+        var ix = Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0])), iy = Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
+        var u = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - ix * iy;
+        return u > 0 ? ix * iy / u : 0;
+      }
+      function seeds(bs) {
+        var m = mark.box, best = null, bi = 0;
+        bs.forEach(function (b) { var o = iou(b, m); if (o > bi) { bi = o; best = b; } });
+        if (word !== "gap" && best && bi > 0.3) return [best];
+        var mh = Math.max(1, m[3] - m[1]), mcx = (m[0] + m[2]) / 2, L = null, R = null, lc = Infinity, rc = Infinity;
+        bs.forEach(function (b) {
+          var cx = (b[0] + b[2]) / 2, dy = Math.abs(b[3] - m[3]) / mh;
+          if (cx < mcx) { var c1 = Math.abs(b[2] - m[0]) / mh + dy; if (c1 < lc) { lc = c1; L = b; } }
+          else { var c2 = Math.abs(b[0] - m[2]) / mh + dy; if (c2 < rc) { rc = c2; R = b; } }
+        });
+        return [lc < 1.5 ? L : null, rc < 1.5 ? R : null];
+      }
+      function follow(prev, bs) {
+        if (!prev || !bs) return null;
+        var best = null, bi = 0.1;
+        bs.forEach(function (b) { var o = iou(prev, b); if (o > bi) { bi = o; best = b; } });
+        return best;
+      }
+      function buildTrack() {
+        var ki = Math.round(kf * det.fps), hi = Math.max.apply(null, Object.keys(det.frames).map(Number).concat([0]));
+        var kb = null;
+        for (var d = 0; d <= 3 && !kb; d++) kb = boxesAt(ki - d) || boxesAt(ki + d);
+        var start = kb ? seeds(kb) : [null];
+        if (!start[0] && !start[1]) { det = null; return; }
+        trackBy = {};
+        [[1, hi], [-1, 0]].forEach(function (dir) {
+          var cur = start.slice(), miss = start.map(function () { return 0; });
+          for (var i = ki; dir[0] > 0 ? i <= dir[1] : i >= dir[1]; i += dir[0]) {
+            var bs = boxesAt(i);
+            if (i !== ki) cur = cur.map(function (c, j) {
+              var n = follow(c, bs);
+              if (n) { miss[j] = 0; return n; }
+              return ++miss[j] > 6 ? null : c;
+            });
+            trackBy[i] = { all: bs || [], sel: cur.slice() };
+          }
+        });
+      }
+      function drawTracked(t) {
+        var fr = trackBy && trackBy[Math.round(t * det.fps)];
+        if (!fr) { draw(near()); return; }
+        var r = contentRect(), dpr = window.devicePixelRatio || 1;
+        cv.width = Math.round(r.W * dpr); cv.height = Math.round(r.H * dpr);
+        cv.style.width = r.W + "px"; cv.style.height = r.H + "px";
+        var g = cv.getContext("2d");
+        g.setTransform(dpr, 0, 0, dpr, 0, 0);
+        g.clearRect(0, 0, r.W, r.H);
+        var sx = r.w / fs[0], sy = r.h / fs[1], lw = Math.max(2.5, r.w / 220);
+        function rect(b) { return [r.x + b[0] * sx, r.y + b[1] * sy, (b[2] - b[0]) * sx, (b[3] - b[1]) * sy]; }
+        g.lineWidth = 1; g.strokeStyle = "rgba(255,255,255,.45)";
+        fr.all.forEach(function (b) { if (fr.sel.indexOf(b) < 0) { var q = rect(b); g.strokeRect(q[0], q[1], q[2], q[3]); } });
+        var L = fr.sel[0], R = fr.sel[1];
+        if (fr.sel.length === 2 && L && R && R[0] > L[2]) {
+          g.beginPath();
+          g.moveTo(r.x + L[2] * sx, r.y + L[1] * sy); g.lineTo(r.x + R[0] * sx, r.y + R[1] * sy);
+          g.lineTo(r.x + R[0] * sx, r.y + R[3] * sy); g.lineTo(r.x + L[2] * sx, r.y + L[3] * sy); g.closePath();
+          g.fillStyle = "rgba(0,229,255,.22)"; g.fill();
+          g.setLineDash([6, 4]); g.strokeStyle = "#00e5ff"; g.lineWidth = Math.max(1.5, lw / 1.5); g.stroke(); g.setLineDash([]);
+        }
+        fr.sel.forEach(function (b) {
+          if (!b) return;
+          var q = rect(b);
+          g.strokeStyle = "rgba(0,0,0,.6)"; g.lineWidth = lw + 2; g.strokeRect(q[0], q[1], q[2], q[3]);
+          g.strokeStyle = "#00e5ff"; g.lineWidth = lw; g.strokeRect(q[0], q[1], q[2], q[3]);
+        });
+      }
       function near() { return v ? Math.abs(v.currentTime - kf) <= 0.15 : true; }
+      function frameStep(now, meta) {
+        if (!v || v.paused || !det) return;
+        if (playEnd != null && v.currentTime >= playEnd) { v.pause(); return; }
+        drawTracked(meta && meta.mediaTime != null ? meta.mediaTime : v.currentTime);
+        rvfc = v.requestVideoFrameCallback(frameStep);
+      }
       function tick() {
         if (!v || v.paused) return;
         if (playEnd != null && v.currentTime >= playEnd) { v.pause(); return; }
-        draw(near());
+        if (det && v.requestVideoFrameCallback) return;
+        if (det) drawTracked(v.currentTime); else draw(near());
         raf = requestAnimationFrame(tick);
       }
       var autoDone = false;
@@ -695,9 +790,11 @@
       var api = {
         play: function () {
           if (!v) return;
+          if (detSrc && !detTried) { loadDet().then(function () { api.play(); }); return; }
           var dur = isFinite(v.duration) ? v.duration : kf + 3;
           var from = start != null && start <= kf ? +start : Math.max(0, kf - 2);
           playEnd = end != null && end > kf ? Math.min(+end, dur) : Math.min(dur, kf + 3);
+          if (det) { from = start != null && start <= kf ? +start : 0; playEnd = end != null && end > kf ? Math.min(+end, dur) : dur; }
           draw(false);
           try { v.currentTime = from; } catch (e) { /* ignore */ }
           var p = v.play();
@@ -708,7 +805,10 @@
       el._kerbMedia = api;
       if (v) {
         v.addEventListener("loadedmetadata", toKeyframe);
-        v.addEventListener("play", function () { if (btn) btn.textContent = "❚❚ Pause"; cancelAnimationFrame(raf); raf = requestAnimationFrame(tick); });
+        v.addEventListener("play", function () {
+          if (btn) btn.textContent = "❚❚ Pause"; cancelAnimationFrame(raf); raf = requestAnimationFrame(tick);
+          if (det && v.requestVideoFrameCallback) { if (rvfc && v.cancelVideoFrameCallback) v.cancelVideoFrameCallback(rvfc); rvfc = v.requestVideoFrameCallback(frameStep); }
+        });
         v.addEventListener("pause", function () { if (btn) btn.textContent = "▶ Play clip"; cancelAnimationFrame(raf); toKeyframe(); });
         v.addEventListener("ended", function () { if (btn) btn.textContent = "▶ Play clip"; toKeyframe(); });
         if (btn) btn.addEventListener("click", function () { if (v.paused) api.play(); else v.pause(); });
@@ -719,7 +819,7 @@
         ready = false;
         var ph = document.createElement("div");
         ph.className = "ph";
-        ph.innerHTML = "<div>Evidence could not be loaded<span class=\"mono\">" + esc(uri) + "</span></div>";
+        ph.innerHTML = "<div>Evidence could not be loaded</div>";
         media.replaceWith(ph);
         if (btn) btn.remove();
         draw(false);

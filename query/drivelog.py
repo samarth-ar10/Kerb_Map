@@ -9,7 +9,7 @@ from collections import Counter
 
 from common.kerb_schema import SPACE_STATES
 
-NOTE = "Log of receipts already made from the supplied footage. Nothing new is uploaded."
+NOTE = "Kerb receipts from this drive, read from dashcam video in the VAST library."
 
 
 def _median(values):

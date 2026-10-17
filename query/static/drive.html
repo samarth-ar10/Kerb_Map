@@ -10,7 +10,7 @@
 </head>
 <body class="simple">
 <header class="sbar">
-  <a class="sback" href="setup.html" data-keep aria-label="Set up">←</a>
+  <a class="sback" href="setup.html" data-keep aria-label="Your drives">←</a>
   <h1 id="title">Drive log</h1>
   <button class="icon-btn" id="theme" type="button" aria-label="Switch theme">Dark</button>
 </header>
@@ -87,7 +87,7 @@
       streets = log.streets || [];
       render("");
     }).catch(function () {
-      document.getElementById("note").textContent = "This drive is not in the supplied footage.";
+      document.getElementById("note").textContent = "This drive is not in the VAST library.";
       document.getElementById("streets").innerHTML = "";
     });
   });

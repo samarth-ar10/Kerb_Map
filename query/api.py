@@ -213,6 +213,21 @@ def _allowed_dirs():
     return [os.path.realpath(d) for d in dirs]
 
 
+@app.get("/api/evidence/detections")
+def evidence_detections(source: str):
+    """Stored per-frame vehicle boxes for one segment (car/truck/bus), so the clip overlay can follow the scene."""
+    from fastapi.responses import JSONResponse
+    from query import evidence as ev
+    if not source.startswith("s3://"):
+        return JSONResponse({"error": "source must be an s3:// segment"}, status_code=404)
+    try:
+        return ev.detections_for(source)
+    except LookupError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=404)
+    except Exception as exc:
+        return JSONResponse({"error": f"could not read detections ({exc})"}, status_code=502)
+
+
 @app.get("/api/evidence")
 def evidence(uri: str, request: Request):
     """Pass an evidence frame or clip through to the browser. s3:// goes via VSS (or S3) server-side."""

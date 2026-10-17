@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Kerb Map · Set up</title>
+<title>Kerb Map · Your dashcam</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="icon" href="favicon.png" type="image/png" sizes="32x32">
 <link rel="stylesheet" href="style.css">
@@ -11,7 +11,7 @@
 <body class="simple">
 <header class="sbar">
   <a class="sback" id="backBtn" href="index.html" data-keep aria-label="Back">←</a>
-  <h1 id="title">Set up my dashcam</h1>
+  <h1 id="title">Connect your dashcam</h1>
   <button class="icon-btn" id="theme" type="button" aria-label="Switch theme">Dark</button>
 </header>
 <div id="banner" class="banner" role="status" hidden></div>
@@ -24,26 +24,27 @@
         <span class="sn">1</span>
         <div class="sbody">
           <h2>Connect your dashcam</h2>
-          <div id="connectIdle">
-            <p>Pair a Wi-Fi dashcam, or use your phone as one.</p>
-            <button class="btn" id="connectBtn" type="button">Connect dashcam</button>
-          </div>
-          <div id="connectDone" class="connected" hidden>
-            <span class="okdot" aria-hidden="true">✓</span>
-            <div><b>Connected: Demo dashcam</b><span>Demo device for this presentation. Real pairing is coming soon.</span></div>
-          </div>
+          <p>Mount a dashcam facing the kerb side, or use your phone as one. Record as you drive in short clips (about 30 s each).</p>
         </div>
       </li>
       <li class="step">
         <span class="sn">2</span>
         <div class="sbody">
-          <h2>Upload a clip</h2>
-          <p>Each 30 s clip is read for parked cars and free kerb. Auto-upload is coming soon.</p>
-          <button class="btn" id="toUpload" type="button" disabled>Upload a clip</button>
+          <h2>Upload as you drive</h2>
+          <p>Each clip goes to VAST and is processed there: parked cars and free kerb are read from the video.</p>
         </div>
       </li>
       <li class="step">
         <span class="sn">3</span>
+        <div class="sbody">
+          <h2>Upload a clip</h2>
+          <p>Send a clip from your dashcam, or try a sample clip.</p>
+          <button class="btn" id="toUpload" type="button">Upload a clip</button>
+          <button class="btn ghostbtn" id="toSample" type="button">Use a sample clip</button>
+        </div>
+      </li>
+      <li class="step">
+        <span class="sn">4</span>
         <div class="sbody">
           <h2>See parking</h2>
           <p>The kerb your drive saw shows up on the map.</p>
@@ -52,15 +53,14 @@
       </li>
     </ol>
     <section class="drives">
-      <h2>My drives</h2>
-      <p class="demo-note">Demo account: drives from the supplied footage</p>
+      <h2>Your drives</h2>
+      <p class="demo-note">Drives in the VAST library</p>
       <ul id="drives" class="dlist"><li class="muted">Loading…</li></ul>
     </section>
   </section>
 
   <!-- 2. upload -->
   <section id="scrUpload" class="scr" hidden>
-    <div class="connected small"><span class="okdot" aria-hidden="true">✓</span><div><b>Demo dashcam</b><span>Demo device</span></div></div>
     <label class="pick" id="pickVideo">
       <input type="file" id="fileVideo" accept="video/*">
       <span class="pickicon" aria-hidden="true">▶</span>
@@ -114,12 +114,11 @@
   UI.theme();
 
   var st = { connected: false, sample: null, job: null, timer: null, t0: 0, fails: 0, clock: null };
-  try { st.connected = sessionStorage.getItem("kerb.demoConnected") === "1"; } catch (e) { /* ignore */ }
 
   // ---------------------------------------------------------------- screens
   function show(name) {
     ["scrSetup", "scrUpload", "scrProgress"].forEach(function (id) { $(id).hidden = id !== name; });
-    $("title").textContent = name === "scrSetup" ? "Set up my dashcam" : name === "scrUpload" ? "Upload a clip" : "Processing your clip";
+    $("title").textContent = name === "scrSetup" ? "Connect your dashcam" : name === "scrUpload" ? "Upload a clip" : "Processing your clip";
     window.scrollTo(0, 0);
   }
   $("backBtn").addEventListener("click", function (e) {
@@ -130,19 +129,14 @@
     show("scrSetup");
   });
 
-  // ---------------------------------------------------------------- 1. connect (demo device)
-  function paintConnect() {
-    $("connectIdle").hidden = st.connected;
-    $("connectDone").hidden = !st.connected;
-    $("toUpload").disabled = !st.connected;
-    $("stepConnect").classList.toggle("stepdone", st.connected);
-  }
-  $("connectBtn").addEventListener("click", function () {
-    st.connected = true;
-    try { sessionStorage.setItem("kerb.demoConnected", "1"); } catch (e) { /* ignore */ }
-    paintConnect();
-  });
+  // ---------------------------------------------------------------- 1. start an upload
   $("toUpload").addEventListener("click", function () { show("scrUpload"); loadSamples(); });
+  $("toSample").addEventListener("click", function () {
+    show("scrUpload");
+    loadSamples().then(function () {
+      if (!$("samplesBox").hidden) $("samplesBox").scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+  });
 
   // ---------------------------------------------------------------- 2. pick + upload
   function canStart() { $("startUpload").disabled = !($("fileVideo").files[0] || st.sample); }
@@ -292,7 +286,6 @@
 
   // ---------------------------------------------------------------- start
   A.init().then(async function () {
-    paintConnect();
     var job = QS.get("job");
     if (job) { show("scrProgress"); resetProgress(""); startPolling(job); }
     var el = $("drives"), drives = [];
@@ -303,6 +296,7 @@
       var m = String(d.drive_id).match(/^([\w-]+):(set\d+)$/);
       var name = m ? "Toronto drive " + m[2].replace(/^set0?/, "#") : String(d.drive_id).replace(/_/g, " ");
       var bits = [];
+      if (d.street) { bits.push(name); name = d.street + (d.date ? " · " + d.date : ""); }
       if (d.clips != null) bits.push(d.clips + " clips");
       if (d.receipts != null) bits.push(d.receipts + " kerb spots");
       var w = max && d.clips ? Math.max(6, d.clips / max * 100) : 0;

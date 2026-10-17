@@ -100,7 +100,10 @@
     var n = Math.floor(len / CAR);
     return n >= 1 ? "Fits " + n + (n === 1 ? " car" : " cars") : "Short gap, " + (+len).toFixed(1) + " m";
   }
-  function seen(iso) { return "Seen " + UI.ago(iso); }
+  function seen(iso, src) {
+    var from = src === "streetcam" ? " from street camera" : src === "dashcam" ? " from dashcam video" : "";
+    return "Seen " + UI.ago(iso) + from;
+  }
   function ageMin(iso) { var t = Date.parse(iso); return isNaN(t) ? null : (Date.now() - t) / 60000; }
   function fade(iso) {
     var m = ageMin(iso);
@@ -153,9 +156,27 @@
     $("plist").innerHTML = "";
     var d;
     var q = S.jobOnly ? { lat: lat, lon: lon, radius_m: 20000, job_id: S.job, limit: 2000 } : { lat: lat, lon: lon, radius_m: RADIUS, limit: 500 };
-    try { d = await A.spaces(q); }
+    var free = [];
+    try {
+      d = await A.spaces(q);
+      // Nearest free spaces come from their own server-side query, widening until at least 3 are found,
+      // so the busy states never crowd them out of the row limit.
+      if (!S.jobOnly) {
+        var radii = [500, 1500, 3000];
+        for (var i = 0; i < radii.length; i++) {
+          var f = await A.spaces({ lat: lat, lon: lon, radius_m: radii[i], state: "free", limit: 200 });
+          free = f.spaces || [];
+          if (free.length >= 3) break;
+        }
+      }
+    }
     catch (e) { $("sheetH").textContent = "Could not load spaces"; $("plist").innerHTML = '<li class="err">' + esc(e.message) + "</li>"; return; }
-    S.rows = (d.spaces || []).filter(function (s) { return s.lat != null && s.lon != null; });
+    var have = {};
+    var all = (d.spaces || []).filter(function (s) { return s.state !== "free" || S.jobOnly; }).concat(free);
+    S.rows = all.filter(function (s) {
+      if (s.lat == null || s.lon == null || have[s.space_id]) return false;
+      have[s.space_id] = 1; return true;
+    });
     S.rows.forEach(function (s) { s._d = dist(lat, lon, s.lat, s.lon); });
     $("area").hidden = !S.label;
     $("area").textContent = S.label;
@@ -192,7 +213,7 @@
     return '<li><button type="button" class="prow' + (s.state === "free" ? "" : " dim") + '" data-id="' + esc(s.space_id) + '">' +
       '<span class="pg s-' + esc(s.state) + '">' + glyph(s.state) + "</span>" +
       '<span class="pmain"><b>' + esc(fmtDist(s._d)) + " · " + esc(s.street || "Street unknown") + "</b>" +
-      '<span class="pmeta">' + esc(label(s.state)) + " · " + esc(seen(s.last_seen).toLowerCase()) + (s.state === "free" ? " · " + esc(fits(s.length_m).toLowerCase()) : "") +
+      '<span class="pmeta">' + esc(label(s.state)) + " · " + esc(seen(s.last_seen, s.source).toLowerCase()) + (s.state === "free" ? " · " + esc(fits(s.length_m).toLowerCase()) : "") +
       (s.preview ? ' <span class="tag-preview">PREVIEW</span>' : "") + "</span></span>" +
       '<span class="chev" aria-hidden="true">›</span></button></li>';
   }
@@ -231,7 +252,7 @@
       '<button class="close" id="closeCard" type="button" aria-label="Back to the list">×</button></div>' +
       '<h2 class="cstreet">' + esc(s.street || "Street unknown") + (s.side === "L" ? " · left side" : s.side === "R" ? " · right side" : "") + "</h2>" +
       (s.preview ? '<p class="pvline"><span class="tag-preview">PREVIEW ENTRY · NOT A RESULT</span></p>' : "") +
-      '<div class="facts3"><div>' + esc(fits(s.length_m)) + "</div><div>" + esc(seen(s.last_seen)) + "</div>" +
+      '<div class="facts3"><div>' + esc(fits(s.length_m)) + "</div><div>" + esc(seen(s.last_seen, s.source)) + "</div>" +
       (s._d != null ? "<div>" + esc(fmtDist(s._d)) + " away</div>" : "") + "</div>" +
       (s.position_status === "uncertain" ? '<p class="muted">Position is approximate.</p>' : "") +
       '<div class="media" id="cardMedia"></div>' +
@@ -239,7 +260,12 @@
       (s.receipt_text ? "<p>" + esc(s.receipt_text) + "</p>" : "") +
       '<p class="muted">' + (conf != null ? "Confidence " + conf + "% · " : "") + esc(UI.sourceLabel(s.source)) + (s.last_seen ? " · " + esc(s.last_seen) : "") + "</p>" +
       (trail.length ? '<ol class="trail">' + trail.map(function (t, i) {
-        var det = A.parseDetail(t), keys = Object.keys(det).filter(function (k) { return k !== "frame_size"; }).slice(0, 3);
+        // Never show storage paths or ids to users.
+        var det = A.parseDetail(t), keys = Object.keys(det).filter(function (k) {
+          var v = det[k];
+          return k !== "frame_size" && !/(_uri|_url|_id|video|path|source|key)$/i.test(k) &&
+            !(typeof v === "string" && /^(s3|file|https?):\/\/|\//i.test(v));
+        }).slice(0, 3);
         return '<li class="' + (t.step === "overrule" ? "ovr" : "") + '"><span class="n">' + (t.step_no || i + 1) + '</span><div class="st">' + esc(STEP_NAMES[t.step] || t.step) + "</div>" +
           '<div class="kv">' + keys.map(function (k) { var v = det[k]; return esc(k.replace(/_/g, " ")) + ": <b>" + esc(Array.isArray(v) ? v.join(", ") : typeof v === "object" ? JSON.stringify(v) : v) + "</b>"; }).join(" · ") + "</div></li>";
       }).join("") + "</ol>" : (d ? '<p class="muted">No steps recorded.</p>' : '<p class="muted">Loading…</p>')) +
