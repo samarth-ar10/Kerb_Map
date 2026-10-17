@@ -4,6 +4,10 @@
 
 Drop a pin or enter a postcode. For each nearby stretch of kerb the page says four things: is it a legal space, is it free or occupied, when was it last seen, and what evidence that rests on. Every answer is a receipt: the frames, the decision trail, and a confidence. "Cannot tell" and "not seen" stay on the page.
 
+## The service
+
+Dashcam owners sync their recordings to the cloud as they drive: each 30-second clip uploads within about a minute, not once a day. We store and process it there on VAST, so the user gets cloud backup and a searchable log of their drives, plus a live map of free kerb space around them or where they are going. The more cars sync, the fresher the map; fixed street cameras keep the busiest kerbs live.
+
 ## The idea
 
 Each side of a road is a line. Along that line we store where a car may stop, which metres a camera actually saw, and whether those metres were occupied, free, or unclear. A free space is a legal, seen, empty gap of about one car length (5.5 m). Unseen kerb stays unknown. Unknown is a different answer from empty.

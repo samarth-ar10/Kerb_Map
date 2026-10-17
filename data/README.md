@@ -17,3 +17,16 @@ own vehicle GPS/OBD annotations were attached.
 
 Licence: PIE dataset, MIT, York University (Rasouli et al., ICCV 2019). Only derived timestamps and coordinates are stored
 here; no PIE video is redistributed. Street names © OpenStreetMap contributors (ODbL).
+
+## video_geo.csv: one packed table, location attached to every segment we use
+
+One row per 5 s segment for the Toronto dashcam (`pie_cam-3`, 1,080 rows) and the three street cameras
+(`neighborhood_cam-1` 307, `sf_streets_cam-5` 180, `nyc_streets_cam-1` 360). Join key: `segment_source` (the segment's
+S3 URI in the index, same as the `source` of the VSS row).
+
+- `kind`: dashcam or street_camera. `geo_source`: `pie_gps` (PIE GPS, per segment start/end), `landmark_estimate`
+  (fixed camera placed from landmarks visible in the frame, about ±75 m, to be refined), or `unknown`.
+- Dashcam rows add PIE video/time, heading, speed, distance and streets.
+- Street cameras: `sf_streets_cam-5` faces Broadway & Columbus Ave, San Francisco (Condor Club, 560 Broadway, in
+  view); `nyc_streets_cam-1` is at Broadway & Walker St, Manhattan (401 Broadway and the Walker St sign in view);
+  `neighborhood_cam-1` location is unknown.

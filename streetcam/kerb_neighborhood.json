@@ -1,0 +1,78 @@
+{
+  "camera_id": "neighborhood_cam-1",
+  "frame": {
+    "filename": "20261001_072331_neighborhood_20260901_chunk_0000.mp4",
+    "segment_number": 3,
+    "frame_index": 80,
+    "time_in_segment_s": 4.0,
+    "image": "frame_neighborhood.jpg",
+    "width": 2048,
+    "height": 1154
+  },
+  "notes": "Polygons are in detection-image pixels (width 2048, height 1154), hand fit on this frame. The same camera is fixed, so both capture days use this drawing. Yellow/near and green/far bands are the kerb strips. Red and orange are driveways. The lane is the asphalt between the kerbs.",
+  "kerb_strips": [
+    {
+      "id": "near",
+      "polygon": [[760, 785], [880, 805], [1000, 835], [1060, 825], [1060, 868], [1000, 878], [880, 848], [760, 828]]
+    },
+    {
+      "id": "far",
+      "polygon": [[700, 710], [880, 678], [1000, 655], [1150, 632], [1280, 680], [1280, 715], [1150, 672], [1000, 695], [880, 718], [700, 750]]
+    }
+  ],
+  "legal_stretches": [
+    {
+      "id": "near_between_driveways",
+      "kerb_id": "near",
+      "centerline": [[760, 806], [880, 826], [1000, 856], [1060, 846]],
+      "px_per_m": 59.375
+    },
+    {
+      "id": "far_curb",
+      "kerb_id": "far",
+      "centerline": [[700, 730], [880, 698], [1000, 675], [1150, 652], [1280, 697]],
+      "px_per_m": 27.13
+    }
+  ],
+  "driveways": [
+    {
+      "id": "left",
+      "polygon": [[400, 860], [790, 900], [810, 1100], [370, 1110]]
+    },
+    {
+      "id": "right",
+      "polygon": [[1120, 820], [1500, 790], [1520, 1060], [1100, 1080]]
+    }
+  ],
+  "lane": {
+    "polygon": [[420, 700], [1360, 690], [1280, 780], [1040, 820], [780, 800], [450, 780], [420, 740]]
+  },
+  "free_gap_m": 5.5,
+  "still_s": 120,
+  "references": [
+    {
+      "id": "suv_side_length",
+      "what": "Track 20260901-0001 box on this frame, side view, x 460 to 745",
+      "pixels": 285,
+      "assumed_m": 4.8,
+      "px_per_m": 59.375,
+      "used_for": "along-kerb scale on the near strip, which is at a similar depth"
+    },
+    {
+      "id": "road_width_at_x880",
+      "what": "Far curb brightness edge y=640 to near curb grass edge y=828, column x=880",
+      "pixels": 188,
+      "assumed_m": 8.0,
+      "px_per_m": 23.5,
+      "used_for": "across-the-road check only; the view is foreshortened, so this is not the along-kerb scale"
+    },
+    {
+      "id": "far_box_vs_suv_height",
+      "what": "Track 20260901-0022 mean box height 95 px versus the SUV box height 208 px on this frame",
+      "pixels": 95,
+      "assumed_m": null,
+      "px_per_m": 27.13,
+      "used_for": "far-kerb along-street scale = near scale times 95/208"
+    }
+  ]
+}
