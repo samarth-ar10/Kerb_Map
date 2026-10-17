@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    .tile { fill: #0072b2; }
+    .mark { fill: #ffffff; }
+    .kerb-a { fill: #15181c; }
+    .kerb-b { fill: #f2c230; }
+    @media (prefers-color-scheme: dark) {
+      .tile { fill: #56b4e9; }
+      .mark { fill: #08131c; }
+      .kerb-a { fill: #eef1f4; }
+      .kerb-b { fill: #e0b225; }
+    }
+  </style>
+  <defs>
+    <clipPath id="tile"><rect width="32" height="32" rx="7"/></clipPath>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect class="tile" width="32" height="32"/>
+    <text class="mark" x="16" y="20" text-anchor="middle" font-family="system-ui, Segoe UI, sans-serif" font-size="16" font-weight="800">P</text>
+    <rect class="kerb-a" x="0" y="26" width="8" height="6"/>
+    <rect class="kerb-b" x="8" y="26" width="8" height="6"/>
+    <rect class="kerb-a" x="16" y="26" width="8" height="6"/>
+    <rect class="kerb-b" x="24" y="26" width="8" height="6"/>
+  </g>
+</svg>

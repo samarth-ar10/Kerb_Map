@@ -42,7 +42,11 @@ FILES = {
     "api.js": "query/static/api.js",
     "label.js": "query/static/label.js",
     "style.css": "query/static/style.css",
+    "favicon.svg": "query/static/favicon.svg",
+    "favicon.png": "query/static/favicon.png",
 }
+
+BINARY_EXT = {".png", ".jpg", ".jpeg", ".webp", ".ico", ".gif"}
 
 REQUIREMENTS = {
     "vastdb": ["fastapi>=0.110", "uvicorn>=0.29", "pyarrow>=15", "vastdb>=1.3"],
@@ -121,7 +125,11 @@ def main():
         shutil.rmtree(OUT)
     os.makedirs(OUT)
     for dest, src in FILES.items():
-        text = open(os.path.join(REPO, src), encoding="utf-8").read()
+        src_path = os.path.join(REPO, src)
+        if os.path.splitext(dest)[1].lower() in BINARY_EXT:
+            shutil.copyfile(src_path, os.path.join(OUT, dest))
+            continue
+        text = open(src_path, encoding="utf-8").read()
         if dest.endswith(".py"):
             text = flatten_imports(text)
         with open(os.path.join(OUT, dest), "w", encoding="utf-8", newline="\n") as fh:
