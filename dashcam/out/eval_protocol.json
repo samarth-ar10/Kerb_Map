@@ -1,0 +1,11 @@
+{
+  "dev_sets": [
+    "set01",
+    "set02"
+  ],
+  "held_out_set": "set03",
+  "per_dev_set": 30,
+  "held_out": 40,
+  "seed": 20261017,
+  "set_choice": "set01 and set02 are the drives the slot step was built on; set03 is the next drive. Not chosen from a score."
+}

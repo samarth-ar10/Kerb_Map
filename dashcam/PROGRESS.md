@@ -66,3 +66,9 @@ Receipts by set: set01 1,257, set02 766, set03 1,057, set04 1,019, set05 372, se
 States: occupied 4,429, rejected 851, free 6, cannot_tell 16. Cosmos labels on the 24 gaps: FREE 6, OCCUPIED 2, CANNOT_TELL 16 (all 16 had confidence under 0.6).
 
 The SDK prints `Listing sorted columns … without elysium enabled` (HTTP 400) while opening these tables. The insert still landed: a later select returned the row counts above.
+
+## Eval sample (not scored)
+
+`dashcam/eval_cases.py prepare` drew 100 spots from identity fields only (seed 20261017). Dev is set01 and set02, 30 each, the two drives the slot step was built on. Held-out is set03, 40 spots, the next drive. That choice was not made from a score. Frames with the spot boxed are in `dashcam/out/eval_frames/` (100 written, 0 errors).
+
+A person still has to label legal/not and free/occupied at `http://127.0.0.1:8765/`. The page does not show receipt states. On the last save it hashes `data/labels/2026-10-17-kerb-spots.csv`, writes `kerb_eval_cases`, and scores once into `dashcam/RESULTS.md`. Those files are not written yet.
