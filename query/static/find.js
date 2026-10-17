@@ -1,4 +1,5 @@
-/* Kerb Map: Find parking. Nearest free kerb first; tap a spot for a simple card. Data via KerbAPI (api.js). */
+/* Kerb Map: Find parking. Mobile first: full-screen map, compact top bar, draggable bottom sheet
+   (peek / half / full). From 900 px wide the sheet becomes a left side panel. Data via KerbAPI (api.js). */
 (function () {
   "use strict";
   var A = window.KerbAPI, UI = window.KerbUI, esc = A.esc;
@@ -9,10 +10,15 @@
     gate: "Picked a frame", boxes: "Found cars in the frame", geometry: "Measured the kerb gap", rule: "Checked street rules",
     cosmos: "Checked the unclear gap (Cosmos)", track: "Watched over time", position: "Placed on the map", overrule: "Corrected by a person"
   };
+  var wide = window.matchMedia("(min-width: 900px)");
 
   UI.theme();
-  var map = L.map("map", { zoomControl: false, zoomSnap: 0.25 }).setView([43.6532, -79.4017], 17);
+  var map = L.map("map", {
+    zoomControl: false, zoomSnap: 0.25, tap: true, attributionControl: false,
+    scrollWheelZoom: wide.matches
+  }).setView([43.6532, -79.4017], 17);
   L.control.zoom({ position: "topright" }).addTo(map);
+  L.control.attribution({ position: wide.matches ? "bottomright" : "topright", prefix: false }).addTo(map);
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19, className: "basemap", attribution: "&copy; OpenStreetMap contributors"
   }).addTo(map);
@@ -21,6 +27,61 @@
   var markers = {};
   var S = { centre: null, rows: [], selected: null, label: "" };
 
+  // ------------------------------------------------------------ bottom sheet (mobile)
+  var sheet = $("sheet");
+  var snapName = "peek";
+  function topH() { return $("ftop").getBoundingClientRect().bottom; }
+  function snaps() {
+    var vh = window.innerHeight;
+    var peek = Math.min(200, Math.round(vh * 0.3));
+    return { peek: peek, half: Math.round(vh * 0.52), full: Math.max(peek + 40, Math.round(vh - topH() - 6)) };
+  }
+  function syncTop() { document.documentElement.style.setProperty("--ftop-h", Math.round(topH() + 8) + "px"); }
+  function setSnap(name, instant) {
+    syncTop();
+    snapName = name;
+    sheet.setAttribute("data-snap", name);
+    if (wide.matches) { sheet.style.height = ""; return; }
+    if (instant) sheet.classList.add("nodrag");
+    sheet.style.height = snaps()[name] + "px";
+    if (instant) setTimeout(function () { sheet.classList.remove("nodrag"); }, 30);
+    document.documentElement.style.setProperty("--sheet-h", snaps()[name] + "px");
+  }
+  (function drag() {
+    var grab = $("grab"), y0 = 0, h0 = 0, moved = false, active = false;
+    grab.addEventListener("pointerdown", function (e) {
+      if (wide.matches) return;
+      active = true; moved = false; y0 = e.clientY; h0 = sheet.getBoundingClientRect().height;
+      sheet.classList.add("dragging");
+      grab.setPointerCapture(e.pointerId);
+    });
+    grab.addEventListener("pointermove", function (e) {
+      if (!active) return;
+      var dy = y0 - e.clientY;
+      if (Math.abs(dy) > 4) moved = true;
+      var s = snaps();
+      sheet.style.height = Math.max(s.peek - 40, Math.min(s.full, h0 + dy)) + "px";
+    });
+    function end(e) {
+      if (!active) return;
+      active = false;
+      sheet.classList.remove("dragging");
+      if (!moved) { setSnap(snapName === "peek" ? "half" : snapName === "half" ? "full" : "half"); return; }
+      var h = sheet.getBoundingClientRect().height, s = snaps(), best = "peek", bd = 1e9;
+      Object.keys(s).forEach(function (k) { var d = Math.abs(s[k] - h); if (d < bd) { bd = d; best = k; } });
+      setSnap(best);
+    }
+    grab.addEventListener("pointerup", end);
+    grab.addEventListener("pointercancel", end);
+  })();
+  function resnap() { setSnap(!wide.matches && !$("cardView").hidden ? "full" : snapName, true); }
+  window.addEventListener("resize", function () { resnap(); map.invalidateSize(); });
+  wide.addEventListener && wide.addEventListener("change", function () {
+    if (wide.matches) map.scrollWheelZoom.enable(); else map.scrollWheelZoom.disable();
+    resnap(); setTimeout(function () { map.invalidateSize(); }, 50);
+  });
+
+  // ------------------------------------------------------------ helpers
   function dist(a, b, c, d) {
     var R = 6371000, r = Math.PI / 180, x = Math.sin((c - a) * r / 2), y = Math.sin((d - b) * r / 2);
     return 2 * R * Math.asin(Math.sqrt(x * x + Math.cos(a * r) * Math.cos(c * r) * y * y));
@@ -35,8 +96,8 @@
   function ageMin(iso) { var t = Date.parse(iso); return isNaN(t) ? null : (Date.now() - t) / 60000; }
   function fade(iso) {
     var m = ageMin(iso);
-    if (m == null) return 0.55;
-    return m <= 15 ? 1 : m <= 60 ? 0.85 : m <= 360 ? 0.7 : 0.55;
+    if (m == null) return 0.6;
+    return m <= 15 ? 1 : m <= 60 ? 0.88 : m <= 360 ? 0.75 : 0.6;
   }
   function shortAge(iso) {
     var m = ageMin(iso);
@@ -59,27 +120,36 @@
   function icon(s, selected) {
     var cls = "bigpin s-" + s.state + (s.position_status === "uncertain" ? " unc" : "") + (selected ? " sel" : "");
     var age = shortAge(s.last_seen);
-    return L.divIcon({ className: "", iconSize: [52, 62], iconAnchor: [26, 22],
+    return L.divIcon({ className: "", iconSize: [52, 64], iconAnchor: [26, 24],
       html: '<span class="bigwrap" style="opacity:' + (selected ? 1 : fade(s.last_seen)) + '"><span class="' + cls + '">' + glyph(s.state) + "</span>" +
         (age ? '<span class="kage">' + age + "</span>" : "") + "</span>" });
   }
+  // Keep a point in the part of the map the sheet does not cover.
+  function focus(latlng, zoom) {
+    if (zoom) map.setView(latlng, zoom, { animate: false });
+    if (wide.matches) { map.panTo(latlng); return; }
+    var size = map.getSize(), top = topH(), covered = Math.min(snaps().half, sheet.getBoundingClientRect().height);
+    var targetY = top + (size.y - top - covered) / 2;
+    var p = map.latLngToContainerPoint(latlng);
+    map.panBy([p.x - size.x / 2, p.y - targetY], { animate: true });
+  }
 
   // ------------------------------------------------------------ load + draw
-  async function load(lat, lon, label, zoom) {
+  async function load(lat, lon, areaLabel, zoom) {
     S.centre = [lat, lon];
-    S.label = label || "";
+    S.label = areaLabel || "";
     hereLayer.clearLayers();
     L.circleMarker(S.centre, { radius: 9, color: "#fff", weight: 3, fillColor: getComputedStyle(document.documentElement).getPropertyValue("--accent").trim(), fillOpacity: 1, interactive: false }).addTo(hereLayer);
-    if (zoom) map.setView(S.centre, zoom);
-    $("plist").innerHTML = '<li class="muted">Looking…</li>';
+    if (zoom) focus(L.latLng(lat, lon), zoom);
+    $("sheetH").textContent = "Looking for spaces…";
+    $("plist").innerHTML = "";
     var d;
     try { d = await A.spaces({ lat: lat, lon: lon, radius_m: RADIUS, limit: 500 }); }
-    catch (e) { $("plist").innerHTML = '<li class="err">Could not load: ' + esc(e.message) + "</li>"; return; }
+    catch (e) { $("sheetH").textContent = "Could not load spaces"; $("plist").innerHTML = '<li class="err">' + esc(e.message) + "</li>"; return; }
     S.rows = (d.spaces || []).filter(function (s) { return s.lat != null && s.lon != null; });
     S.rows.forEach(function (s) { s._d = dist(lat, lon, s.lat, s.lon); });
-    var area = $("area");
-    area.hidden = !S.label;
-    area.textContent = S.label;
+    $("area").hidden = !S.label;
+    $("area").textContent = S.label;
     draw();
   }
 
@@ -88,21 +158,24 @@
     markers = {};
     var rows = S.rows.filter(visible);
     rows.forEach(function (s) {
-      var m = L.marker([s.lat, s.lon], { icon: icon(s, s.space_id === S.selected), title: label(s.state) + " · " + (s.street || ""), riseOnHover: true,
-        zIndexOffset: s.state === "free" ? 500 : 0 })
+      var m = L.marker([s.lat, s.lon], { icon: icon(s, s.space_id === S.selected), title: label(s.state) + " · " + (s.street || ""),
+        keyboard: true, zIndexOffset: s.state === "free" ? 500 : 0 })
         .on("click", function () { openSpot(s.space_id); }).addTo(spotLayer);
       markers[s.space_id] = { m: m, s: s };
     });
     var free = S.rows.filter(function (s) { return s.state === "free"; }).sort(function (a, b) { return a._d - b._d; });
     var rest = rows.filter(function (s) { return s.state !== "free"; }).sort(function (a, b) { return a._d - b._d; });
-    $("nfree").textContent = free.length ? free.length + " free" : "";
+    $("sheetH").innerHTML = free.length
+      ? '<span class="nfree">' + free.length + "</span> free " + (free.length === 1 ? "space" : "spaces") + " nearby"
+      : "No free spaces seen nearby";
     var html = free.map(row).join("");
-    if (!free.length) html = '<li class="empty"><b>No free spots seen near here yet.</b></li>';
     if (rest.length) html += '<li class="sub">Also nearby</li>' + rest.slice(0, 12).map(row).join("");
     $("plist").innerHTML = html;
     $("plist").querySelectorAll("button[data-id]").forEach(function (b) {
       b.addEventListener("click", function () { openSpot(b.getAttribute("data-id")); });
     });
+    var n = ($("showOcc").checked ? 1 : 0) + ($("showOther").checked ? 1 : 0);
+    $("filterLabel").textContent = n === 0 ? "Free only" : n === 1 && $("showOcc").checked ? "Free & taken" : n === 1 ? "Free & other" : "All kerb";
   }
 
   function row(s) {
@@ -110,14 +183,15 @@
       '<span class="pg s-' + esc(s.state) + '">' + glyph(s.state) + "</span>" +
       '<span class="pmain"><b>' + esc(fmtDist(s._d)) + " · " + esc(s.street || "Street unknown") + "</b>" +
       '<span class="pmeta">' + esc(label(s.state)) + " · " + esc(seen(s.last_seen).toLowerCase()) + (s.state === "free" ? " · " + esc(fits(s.length_m).toLowerCase()) : "") +
-      (s.preview ? ' <span class="tag-preview">PREVIEW</span>' : "") + "</span></span></button></li>";
+      (s.preview ? ' <span class="tag-preview">PREVIEW</span>' : "") + "</span></span>" +
+      '<span class="chev" aria-hidden="true">›</span></button></li>';
   }
 
   // ------------------------------------------------------------ spot card
   function select(id) {
     if (S.selected && markers[S.selected]) markers[S.selected].m.setIcon(icon(markers[S.selected].s, false));
     S.selected = id;
-    if (id && markers[id]) { markers[id].m.setIcon(icon(markers[id].s, true)); map.panTo(markers[id].m.getLatLng()); }
+    if (id && markers[id]) markers[id].m.setIcon(icon(markers[id].s, true));
   }
 
   async function openSpot(id) {
@@ -128,32 +202,29 @@
     card.hidden = false;
     card.innerHTML = cardHtml(s, null);
     wireCard(s, null);
-    $("sheet").scrollTop = 0;
-    $("sheet").classList.add("open");
+    $("sscroll").scrollTop = 0;
+    setSnap(wide.matches ? snapName : "full");
+    if (markers[id]) focus(markers[id].m.getLatLng());
     try {
       var d = await A.receipt(id);
       if (S.selected !== id) return;
-      card.innerHTML = cardHtml(Object.assign({}, s, d.space || {}), d);
-      wireCard(Object.assign({}, s, d.space || {}), d);
+      var full = Object.assign({}, s, d.space || {});
+      card.innerHTML = cardHtml(full, d);
+      wireCard(full, d);
     } catch (e) { /* keep the short card */ }
   }
 
   function cardHtml(s, d) {
     var trail = (d && d.trail) || [];
     var conf = s.confidence != null ? Math.round(Math.max(0, Math.min(1, +s.confidence)) * 100) : null;
-    return '<button class="close" id="closeCard" type="button" aria-label="Back to list">×</button>' +
-      '<div class="status s-' + esc(s.state) + '"><span class="sg">' + glyph(s.state) + "</span>" + esc(label(s.state)) + "</div>" +
+    return '<div class="chead"><div class="status s-' + esc(s.state) + '"><span class="sg">' + glyph(s.state) + "</span>" + esc(label(s.state)) + "</div>" +
+      '<button class="close" id="closeCard" type="button" aria-label="Back to the list">×</button></div>' +
       '<h2 class="cstreet">' + esc(s.street || "Street unknown") + (s.side === "L" ? " · left side" : s.side === "R" ? " · right side" : "") + "</h2>" +
-      (s.preview ? '<p><span class="tag-preview">PREVIEW ENTRY · NOT A RESULT</span></p>' : "") +
-      '<div class="facts3"><div><b>' + esc(fits(s.length_m)) + "</b></div><div><b>" + esc(seen(s.last_seen)) + "</b></div>" +
-      (s._d != null ? "<div><b>" + esc(fmtDist(s._d)) + " away</b></div>" : "") + "</div>" +
+      (s.preview ? '<p class="pvline"><span class="tag-preview">PREVIEW ENTRY · NOT A RESULT</span></p>' : "") +
+      '<div class="facts3"><div>' + esc(fits(s.length_m)) + "</div><div>" + esc(seen(s.last_seen)) + "</div>" +
+      (s._d != null ? "<div>" + esc(fmtDist(s._d)) + " away</div>" : "") + "</div>" +
       (s.position_status === "uncertain" ? '<p class="muted">Position is approximate.</p>' : "") +
       '<div class="media" id="cardMedia"></div>' +
-      '<div class="fb" id="fb"><button type="button" class="fbb" data-v="up">👍 Looks right</button><button type="button" class="fbb" data-v="down">👎 Not right</button></div>' +
-      '<div class="fbreasons" id="fbReasons" hidden>' + A.FEEDBACK_REASONS.map(function (r) {
-        return '<button type="button" class="fbr" data-r="' + r[0] + '">' + esc(r[1]) + "</button>";
-      }).join("") + "</div>" +
-      '<p class="fbdone" id="fbDone" hidden></p>' +
       '<details class="why"><summary>Why we think so</summary>' +
       (s.receipt_text ? "<p>" + esc(s.receipt_text) + "</p>" : "") +
       '<p class="muted">' + (conf != null ? "Confidence " + conf + "% · " : "") + esc(UI.sourceLabel(s.source)) + (s.last_seen ? " · " + esc(s.last_seen) : "") + "</p>" +
@@ -162,7 +233,13 @@
         return '<li class="' + (t.step === "overrule" ? "ovr" : "") + '"><span class="n">' + (t.step_no || i + 1) + '</span><div class="st">' + esc(STEP_NAMES[t.step] || t.step) + "</div>" +
           '<div class="kv">' + keys.map(function (k) { var v = det[k]; return esc(k.replace(/_/g, " ")) + ": <b>" + esc(Array.isArray(v) ? v.join(", ") : typeof v === "object" ? JSON.stringify(v) : v) + "</b>"; }).join(" · ") + "</div></li>";
       }).join("") + "</ol>" : (d ? '<p class="muted">No steps recorded.</p>' : '<p class="muted">Loading…</p>')) +
-      "</details>";
+      "</details>" +
+      '<div class="fbbar">' +
+      '<div class="fb" id="fb"><button type="button" class="fbb" data-v="up">👍 Looks right</button><button type="button" class="fbb" data-v="down">👎 Not right</button></div>' +
+      '<div class="fbreasons" id="fbReasons" hidden>' + A.FEEDBACK_REASONS.map(function (r) {
+        return '<button type="button" class="fbr" data-r="' + r[0] + '">' + esc(r[1]) + "</button>";
+      }).join("") + "</div>" +
+      '<p class="fbdone" id="fbDone" hidden></p></div>';
   }
 
   function wireCard(s, d) {
@@ -198,6 +275,7 @@
     $("cardView").innerHTML = "";
     $("listView").hidden = false;
     select(null);
+    if (!wide.matches && snapName === "full") setSnap("half");
   }
 
   // ------------------------------------------------------------ controls
@@ -205,9 +283,11 @@
     e.preventDefault();
     var place = $("dest").value.trim();
     if (!place) return;
+    $("dest").blur();
     var g = await A.geocode(place);
     if (!g) { $("area").hidden = false; $("area").textContent = "Couldn't find “" + place + "”"; return; }
     closeCard();
+    setSnap("peek");
     load(g.lat, g.lon, "Near " + g.label.replace(/ \(from receipts\)$/, ""), 17.5);
   });
   $("nearMe").addEventListener("click", function () {
@@ -218,19 +298,24 @@
       load(p.coords.latitude, p.coords.longitude, "Near you", 17.5);
     }, function () { $("area").textContent = "Location not shared"; }, { timeout: 8000, maximumAge: 60000 });
   });
-  $("filterBtn").addEventListener("click", function () {
-    var pop = $("filterPop"), open = pop.hidden;
-    pop.hidden = !open;
-    this.setAttribute("aria-expanded", String(open));
-  });
-  document.addEventListener("click", function (e) {
-    if (!e.target.closest(".fmenu")) { $("filterPop").hidden = true; $("filterBtn").setAttribute("aria-expanded", "false"); }
-  });
+  function openFilter(open) {
+    $("filterSheet").hidden = !open;
+    if (open) $("filterDone").focus(); else $("filterBtn").focus();
+  }
+  $("filterBtn").addEventListener("click", function () { openFilter(true); });
+  $("filterDone").addEventListener("click", function () { openFilter(false); });
+  $("filterBack").addEventListener("click", function () { openFilter(false); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("filterSheet").hidden) openFilter(false); });
   ["showOcc", "showOther"].forEach(function (id) { $(id).addEventListener("change", draw); });
-  map.on("click", function () { if (!$("cardView").hidden) closeCard(); });
+  map.on("click", function () {
+    if (!$("cardView").hidden) closeCard();
+    else if (!wide.matches && snapName !== "peek") setSnap("peek");
+  });
 
   // ------------------------------------------------------------ start: URL pin, else the area with data
+  setSnap("peek", true);
   A.init().then(async function () {
+    setSnap("peek", true);
     var qs = new URLSearchParams(location.search);
     if (qs.get("lat") && qs.get("lon")) { load(+qs.get("lat"), +qs.get("lon"), "", 17.5); return; }
     var all = [];
@@ -241,7 +326,8 @@
     var lat = pool.reduce(function (a, s) { return a + s.lat; }, 0) / pool.length;
     var lon = pool.reduce(function (a, s) { return a + s.lon; }, 0) / pool.length;
     map.invalidateSize();
-    map.fitBounds(all.map(function (s) { return [s.lat, s.lon]; }), { padding: [50, 50], maxZoom: 18 });
-    load(lat, lon, "Demo area" + (pool[0].street ? " · near " + pool[0].street : ""));
+    var pad = wide.matches ? { padding: [50, 50] } : { paddingTopLeft: [24, topH() + 16], paddingBottomRight: [24, snaps().peek + 16] };
+    map.fitBounds(all.map(function (s) { return [s.lat, s.lon]; }), Object.assign({ maxZoom: 18 }, pad));
+    load(lat, lon, "Demo area" + (pool[0].street ? " · " + pool[0].street : ""));
   });
 })();

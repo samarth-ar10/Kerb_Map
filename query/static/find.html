@@ -2,50 +2,60 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kerb Map · Find parking</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body class="find">
-<header class="fbar">
-  <a class="sback" href="index.html" data-keep aria-label="Home">←</a>
-  <form id="destForm" class="fsearch" role="search">
-    <input id="dest" type="search" autocomplete="off" placeholder="Where are you going?" aria-label="Where are you going?">
-    <button class="btn" type="submit">Go</button>
-  </form>
-  <button class="fbtn" id="nearMe" type="button" aria-label="Near me" title="Near me">
-    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4" stroke="currentColor" stroke-width="2"/></svg>
-  </button>
-  <div class="fmenu">
-    <button class="fbtn" id="filterBtn" type="button" aria-expanded="false" aria-controls="filterPop" aria-label="Filter" title="Filter">
-      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4-2v-4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
-    </button>
-    <div class="fpop" id="filterPop" hidden>
-      <label><input type="checkbox" id="showOcc" checked> Taken spots</label>
-      <label><input type="checkbox" id="showOther"> Not a space / can't tell</label>
-      <button class="icon-btn" id="theme" type="button" aria-label="Switch theme">Dark</button>
-    </div>
-  </div>
-</header>
-<div id="banner" class="banner" role="status" hidden></div>
+<div id="map" role="application" aria-label="Parking map"></div>
 
-<main class="fwrap">
-  <div class="fmap">
-    <div id="map" role="application" aria-label="Parking map"></div>
-    <div class="areachip" id="area" hidden></div>
+<div class="ftop" id="ftop">
+  <header class="fbar">
+    <a class="sback" href="index.html" data-keep aria-label="Home">←</a>
+    <form id="destForm" class="fsearch" role="search">
+      <input id="dest" type="search" enterkeyhint="go" autocomplete="off" placeholder="Where are you going?" aria-label="Where are you going?">
+    </form>
+    <button class="fbtn" id="nearMe" type="button" aria-label="Near me" title="Near me">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4" stroke="currentColor" stroke-width="2"/></svg>
+    </button>
+  </header>
+  <div id="banner" class="banner" role="status" hidden></div>
+  <div class="chips">
+    <button class="chipbtn" id="filterBtn" type="button" aria-haspopup="dialog">
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4-2v-4z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg>
+      <span id="filterLabel">Free &amp; taken</span>
+    </button>
+    <span class="areachip" id="area" hidden></span>
   </div>
-  <section class="sheet" id="sheet" aria-live="polite">
+</div>
+
+<section class="sheet" id="sheet" data-snap="peek" aria-label="Nearest parking">
+  <div class="grab" id="grab">
     <div class="handle" aria-hidden="true"></div>
+  </div>
+  <div class="sscroll" id="sscroll">
     <div id="listView">
-      <h2 class="sheet-h">Nearest parking <span id="nfree" class="nfree"></span></h2>
-      <ul class="plist" id="plist"><li class="muted">Loading…</li></ul>
+      <h2 class="sheet-h" id="sheetH">Looking for spaces…</h2>
+      <ul class="plist" id="plist"></ul>
       <p class="unknown">No marker means no camera saw that kerb yet.</p>
     </div>
     <div id="cardView" hidden></div>
-  </section>
-</main>
+  </div>
+</section>
+
+<div class="fsheet" id="filterSheet" role="dialog" aria-modal="true" aria-labelledby="filterTitle" hidden>
+  <div class="fback" id="filterBack"></div>
+  <div class="fpanel">
+    <h2 id="filterTitle">Show on the map</h2>
+    <label class="frow"><span>Free spaces</span><input type="checkbox" checked disabled></label>
+    <label class="frow"><span>Taken spaces</span><input type="checkbox" id="showOcc" checked></label>
+    <label class="frow"><span>Not a space / can't tell</span><input type="checkbox" id="showOther"></label>
+    <div class="frow"><span>Theme</span><button class="icon-btn" id="theme" type="button">Dark</button></div>
+    <button class="btn wide" id="filterDone" type="button">Done</button>
+  </div>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script src="api.js"></script>
