@@ -9,68 +9,303 @@
 </head>
 <body class="simple">
 <header class="sbar">
-  <a class="sback" href="index.html" data-keep aria-label="Home">←</a>
-  <h1>Set up my dashcam</h1>
+  <a class="sback" id="backBtn" href="index.html" data-keep aria-label="Back">←</a>
+  <h1 id="title">Set up my dashcam</h1>
   <button class="icon-btn" id="theme" type="button" aria-label="Switch theme">Dark</button>
 </header>
 <div id="banner" class="banner" role="status" hidden></div>
-<main class="narrow">
-  <ol class="steps">
-    <li class="step">
-      <span class="sn">1</span>
-      <div class="sbody">
-        <h2>Connect your dashcam or phone</h2>
-        <p>Pair a Wi-Fi dashcam, or use your phone as one.</p>
-        <button class="btn" type="button" disabled>Connect</button> <span class="soon">Coming soon</span>
-      </div>
-    </li>
-    <li class="step">
-      <span class="sn">2</span>
-      <div class="sbody">
-        <h2>Turn on auto-upload</h2>
-        <p>Each 30 s clip uploads within about a minute.</p>
-        <label class="toggle"><input type="checkbox" disabled><span></span>Auto-upload</label> <span class="soon">Coming soon</span>
-      </div>
-    </li>
-    <li class="step">
-      <span class="sn">3</span>
-      <div class="sbody">
-        <h2>Done</h2>
-        <p>Your drives show up below. The kerb they saw shows up on the map.</p>
-        <a class="btn" href="find.html" data-keep>Find parking</a>
-      </div>
-    </li>
-  </ol>
 
-  <section class="drives">
-    <h2>My drives</h2>
-    <p class="demo-note">Demo account: drives from the supplied footage</p>
-    <ul id="drives" class="dlist"><li class="muted">Loading…</li></ul>
+<main class="narrow">
+  <!-- 1. set up -->
+  <section id="scrSetup" class="scr">
+    <ol class="steps">
+      <li class="step" id="stepConnect">
+        <span class="sn">1</span>
+        <div class="sbody">
+          <h2>Connect your dashcam</h2>
+          <div id="connectIdle">
+            <p>Pair a Wi-Fi dashcam, or use your phone as one.</p>
+            <button class="btn" id="connectBtn" type="button">Connect dashcam</button>
+          </div>
+          <div id="connectDone" class="connected" hidden>
+            <span class="okdot" aria-hidden="true">✓</span>
+            <div><b>Connected: Demo dashcam</b><span>Demo device for this presentation. Real pairing is coming soon.</span></div>
+          </div>
+        </div>
+      </li>
+      <li class="step">
+        <span class="sn">2</span>
+        <div class="sbody">
+          <h2>Upload a clip</h2>
+          <p>Each 30 s clip is read for parked cars and free kerb. Auto-upload is coming soon.</p>
+          <button class="btn" id="toUpload" type="button" disabled>Upload a clip</button>
+        </div>
+      </li>
+      <li class="step">
+        <span class="sn">3</span>
+        <div class="sbody">
+          <h2>See parking</h2>
+          <p>The kerb your drive saw shows up on the map.</p>
+          <a class="btn ghostbtn" href="find.html" data-keep>Find parking</a>
+        </div>
+      </li>
+    </ol>
+    <section class="drives">
+      <h2>My drives</h2>
+      <p class="demo-note">Demo account: drives from the supplied footage</p>
+      <ul id="drives" class="dlist"><li class="muted">Loading…</li></ul>
+    </section>
+  </section>
+
+  <!-- 2. upload -->
+  <section id="scrUpload" class="scr" hidden>
+    <div class="connected small"><span class="okdot" aria-hidden="true">✓</span><div><b>Demo dashcam</b><span>Demo device</span></div></div>
+    <label class="pick" id="pickVideo">
+      <input type="file" id="fileVideo" accept="video/*">
+      <span class="pickicon" aria-hidden="true">▶</span>
+      <span class="picktext"><b id="videoName">Choose a video clip</b><span>MP4, about 30 s</span></span>
+    </label>
+    <label class="pick small" id="pickGps">
+      <input type="file" id="fileGps" accept=".csv,text/csv">
+      <span class="pickicon" aria-hidden="true">⌖</span>
+      <span class="picktext"><b id="gpsName">Add GPS track (optional)</b><span>CSV</span></span>
+    </label>
+    <div id="samplesBox" hidden>
+      <h2 class="minor">Or use a sample clip</h2>
+      <div id="samples" class="samples"></div>
+    </div>
+    <p class="err" id="uploadErr" hidden></p>
+    <div class="bottombar">
+      <button class="btn wide" id="startUpload" type="button" disabled>Upload</button>
+    </div>
+  </section>
+
+  <!-- 3. progress -->
+  <section id="scrProgress" class="scr" hidden>
+    <p class="jobfile" id="jobFile"></p>
+    <div class="upbar" id="upbarBox" hidden><div class="bar"><i id="upbar"></i></div><b id="uppct">0%</b></div>
+    <ol class="psteps" id="psteps"></ol>
+    <div id="results" hidden>
+      <div class="segs"><b id="segN">–</b><span>segments found</span></div>
+      <div class="rstates" id="rstates"></div>
+    </div>
+    <div class="errbox" id="errBox" hidden>
+      <b>Something went wrong</b>
+      <p id="errMsg"></p>
+      <button class="btn wide ghostbtn" id="retryBtn" type="button">Try again</button>
+      <button class="btn wide" id="preparedBtn" type="button" hidden>Use the prepared result</button>
+    </div>
+    <div class="bottombar" id="progBar">
+      <a class="btn wide" id="seeParking" href="find.html" hidden>See parking from this drive</a>
+      <p class="elapsed" id="elapsed"></p>
+    </div>
   </section>
 </main>
+
 <script src="api.js"></script>
 <script>
 (function () {
   "use strict";
   var A = window.KerbAPI, UI = window.KerbUI, esc = A.esc;
+  var $ = function (id) { return document.getElementById(id); };
+  var QS = new URLSearchParams(location.search);
+  var PREVIEW_Q = QS.get("preview") === "1" ? "&preview=1" : "";
   UI.theme();
-  function nice(id) {
-    var m = String(id).match(/^([\w-]+):(set\d+)$/);
-    if (m) return "Toronto drive " + m[2].replace("set", "#").replace("#0", "#");
-    return String(id).replace(/_/g, " ");
+
+  var st = { connected: false, sample: null, job: null, timer: null, t0: 0, fails: 0, clock: null };
+  try { st.connected = sessionStorage.getItem("kerb.demoConnected") === "1"; } catch (e) { /* ignore */ }
+
+  // ---------------------------------------------------------------- screens
+  function show(name) {
+    ["scrSetup", "scrUpload", "scrProgress"].forEach(function (id) { $(id).hidden = id !== name; });
+    $("title").textContent = name === "scrSetup" ? "Set up my dashcam" : name === "scrUpload" ? "Upload a clip" : "Processing your clip";
+    window.scrollTo(0, 0);
   }
+  $("backBtn").addEventListener("click", function (e) {
+    if (!$("scrSetup").hidden) return;
+    e.preventDefault();
+    stopPolling();
+    setUrlJob(null);
+    show("scrSetup");
+  });
+
+  // ---------------------------------------------------------------- 1. connect (demo device)
+  function paintConnect() {
+    $("connectIdle").hidden = st.connected;
+    $("connectDone").hidden = !st.connected;
+    $("toUpload").disabled = !st.connected;
+    $("stepConnect").classList.toggle("stepdone", st.connected);
+  }
+  $("connectBtn").addEventListener("click", function () {
+    st.connected = true;
+    try { sessionStorage.setItem("kerb.demoConnected", "1"); } catch (e) { /* ignore */ }
+    paintConnect();
+  });
+  $("toUpload").addEventListener("click", function () { show("scrUpload"); loadSamples(); });
+
+  // ---------------------------------------------------------------- 2. pick + upload
+  function canStart() { $("startUpload").disabled = !($("fileVideo").files[0] || st.sample); }
+  $("fileVideo").addEventListener("change", function () {
+    var f = this.files[0];
+    $("videoName").textContent = f ? f.name : "Choose a video clip";
+    $("pickVideo").classList.toggle("chosen", !!f);
+    if (f) { st.sample = null; paintSamples(); }
+    canStart();
+  });
+  $("fileGps").addEventListener("change", function () {
+    var f = this.files[0];
+    $("gpsName").textContent = f ? f.name : "Add GPS track (optional)";
+    $("pickGps").classList.toggle("chosen", !!f);
+  });
+  var sampleList = [];
+  async function loadSamples() {
+    sampleList = await A.samples();
+    $("samplesBox").hidden = !sampleList.length;
+    paintSamples();
+  }
+  function paintSamples() {
+    $("samples").innerHTML = sampleList.map(function (s) {
+      var on = st.sample === s.sample_id;
+      return '<button type="button" class="sample' + (on ? " on" : "") + '" data-id="' + esc(s.sample_id) + '" aria-pressed="' + on + '">' +
+        '<span class="pickicon" aria-hidden="true">' + (on ? "✓" : "▶") + "</span><span>" + esc(s.label || s.sample_id) + "</span></button>";
+    }).join("");
+    $("samples").querySelectorAll("button").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var id = b.getAttribute("data-id");
+        st.sample = st.sample === id ? null : id;
+        if (st.sample) { $("fileVideo").value = ""; $("videoName").textContent = "Choose a video clip"; $("pickVideo").classList.remove("chosen"); }
+        paintSamples(); canStart();
+      });
+    });
+  }
+  $("startUpload").addEventListener("click", async function () {
+    var file = $("fileVideo").files[0] || null, gps = $("fileGps").files[0] || null;
+    var label = file ? file.name : ((sampleList.find(function (s) { return s.sample_id === st.sample; }) || {}).label || "Sample clip");
+    $("uploadErr").hidden = true;
+    show("scrProgress");
+    resetProgress(label);
+    $("upbarBox").hidden = false;
+    paintSteps([{ name: A.UPLOAD_STEPS[0], status: "running" }]);
+    try {
+      var r = await A.upload(file, gps, file ? null : st.sample, function (f) {
+        var p = Math.round(f * 100);
+        $("upbar").style.width = p + "%"; $("uppct").textContent = p + "%";
+      });
+      $("upbarBox").hidden = true;
+      startPolling(r.job_id);
+    } catch (e) {
+      showError(e.message);
+    }
+  });
+
+  // ---------------------------------------------------------------- 3. progress
+  function setUrlJob(id) {
+    var q = new URLSearchParams(location.search);
+    if (id) q.set("job", id); else q.delete("job");
+    history.replaceState(null, "", location.pathname + (q.toString() ? "?" + q : ""));
+  }
+  function resetProgress(label) {
+    $("jobFile").textContent = label || "";
+    $("results").hidden = true; $("errBox").hidden = true; $("seeParking").hidden = true; $("progBar").hidden = false;
+    $("upbar").style.width = "0"; $("uppct").textContent = "0%";
+    st.t0 = Date.now();
+    clearInterval(st.clock);
+    st.clock = setInterval(function () {
+      var s = Math.round((Date.now() - st.t0) / 1000);
+      $("elapsed").textContent = Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0") + " elapsed";
+    }, 500);
+  }
+  function stopPolling() { clearTimeout(st.timer); st.timer = null; clearInterval(st.clock); }
+  function startPolling(id) {
+    st.job = id; st.fails = 0;
+    setUrlJob(id);
+    poll();
+  }
+  async function poll() {
+    var d;
+    try { d = await A.uploadStatus(st.job); st.fails = 0; }
+    catch (e) {
+      st.fails++;
+      if (e.status === 404 || st.fails >= 5) { showError(e.status === 404 ? "This job was not found." : "Lost contact with the server: " + e.message); return; }
+      st.timer = setTimeout(poll, 2000);
+      return;
+    }
+    render(d);
+    if (d.state === "done") { finish(d); return; }
+    if (d.state === "error") { showError(d.message || "Processing stopped."); return; }
+    st.timer = setTimeout(poll, 2000);
+  }
+  function fmtTime(iso) {
+    if (!iso) return "";
+    var t = new Date(iso);
+    return isNaN(t) ? "" : t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  }
+  function paintSteps(steps) {
+    var byName = {};
+    (steps || []).forEach(function (s) { byName[s.name] = s; });
+    var names = A.UPLOAD_STEPS.slice();
+    (steps || []).forEach(function (s) { if (names.indexOf(s.name) < 0) names.push(s.name); });
+    $("psteps").innerHTML = names.map(function (n) {
+      var s = byName[n] || { status: "pending" };
+      var status = s.status || "pending";
+      var icon = status === "done" ? "✓" : status === "error" ? "✕" : status === "running" ? "" : "";
+      return '<li class="ps ps-' + esc(status) + '"><span class="pi" aria-hidden="true">' + icon + "</span>" +
+        '<div class="pt"><b>' + esc(n) + "</b>" +
+        '<span class="pd">' + esc(status === "running" ? "working…" : status === "pending" ? "waiting" : status === "error" ? "failed" : "done") +
+        (s.at ? " · " + esc(fmtTime(s.at)) : "") + (s.detail ? " · " + esc(s.detail) : "") + "</span></div></li>";
+    }).join("");
+  }
+  function render(d) {
+    if (d.filename) $("jobFile").innerHTML = esc(d.filename) + (d.preview ? ' <span class="tag-preview">PREVIEW JOB</span>' : "");
+    paintSteps(d.steps);
+    if (d.segments_found != null) { $("results").hidden = false; $("segN").textContent = d.segments_found; }
+    var by = d.receipts_by_state;
+    $("rstates").innerHTML = by ? ["free", "occupied", "not_space", "cannot_tell"].map(function (k) {
+      return '<div class="rs">' + UI.glyph(k) + "<b>" + (by[k] || 0) + "</b><span>" + esc(UI.stateLabel(k)) + "</span></div>";
+    }).join("") : "";
+  }
+  function finish(d) {
+    stopPolling();
+    var href = "find.html?job_id=" + encodeURIComponent(d.job_id || st.job) +
+      (d.center && d.center.lat != null ? "&lat=" + d.center.lat + "&lon=" + d.center.lon : "") + PREVIEW_Q;
+    $("seeParking").href = href;
+    $("seeParking").hidden = false;
+    $("elapsed").textContent = "Done";
+    $("seeParking").focus();
+  }
+  async function showError(msg) {
+    stopPolling();
+    $("errMsg").textContent = msg || "";
+    $("progBar").hidden = true;
+    $("errBox").hidden = false;
+    $("errBox").scrollIntoView({ block: "center", behavior: "smooth" });
+    $("preparedBtn").hidden = true;
+    var prep = await A.latestDone();
+    if (prep && prep.job_id) { $("preparedBtn").hidden = false; $("preparedBtn").dataset.job = prep.job_id; }
+  }
+  $("retryBtn").addEventListener("click", function () { setUrlJob(null); show("scrUpload"); loadSamples(); });
+  $("preparedBtn").addEventListener("click", function () {
+    resetProgress("Prepared result");
+    startPolling(this.dataset.job);
+  });
+
+  // ---------------------------------------------------------------- start
   A.init().then(async function () {
-    var el = document.getElementById("drives");
-    var drives = [];
+    paintConnect();
+    var job = QS.get("job");
+    if (job) { show("scrProgress"); resetProgress(""); startPolling(job); }
+    var el = $("drives"), drives = [];
     try { drives = await A.replayDrives([]); } catch (e) { drives = []; }
     if (!drives.length) { el.innerHTML = '<li class="muted">No drives yet</li>'; return; }
     var max = drives.reduce(function (m, d) { return Math.max(m, d.clips || 0); }, 0);
     el.innerHTML = drives.map(function (d) {
+      var m = String(d.drive_id).match(/^([\w-]+):(set\d+)$/);
+      var name = m ? "Toronto drive " + m[2].replace(/^set0?/, "#") : String(d.drive_id).replace(/_/g, " ");
       var bits = [];
       if (d.clips != null) bits.push(d.clips + " clips");
       if (d.receipts != null) bits.push(d.receipts + " kerb spots");
       var w = max && d.clips ? Math.max(6, d.clips / max * 100) : 0;
-      return '<li><span class="dicon" aria-hidden="true">▶</span><div class="dmain"><b>' + esc(nice(d.drive_id)) + "</b>" +
+      return '<li><span class="dicon" aria-hidden="true">▶</span><div class="dmain"><b>' + esc(name) + "</b>" +
         '<span class="dmeta">' + esc(bits.join(" · ") || d.drive_id) + "</span>" +
         (w ? '<span class="dbar"><i style="width:' + w + '%"></i></span>' : "") + "</div></li>";
     }).join("");

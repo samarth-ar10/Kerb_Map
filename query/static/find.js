@@ -25,7 +25,15 @@
   var spotLayer = L.layerGroup().addTo(map);
   var hereLayer = L.layerGroup().addTo(map);
   var markers = {};
-  var S = { centre: null, rows: [], selected: null, label: "" };
+  var QS = new URLSearchParams(location.search);
+  var S = { centre: null, rows: [], selected: null, label: "", job: QS.get("job_id") || "", jobOnly: !!QS.get("job_id") };
+  function paintJobChip() {
+    var c = $("jobChip");
+    c.hidden = !S.job;
+    c.classList.toggle("on", S.jobOnly);
+    c.setAttribute("aria-pressed", String(S.jobOnly));
+    c.textContent = S.jobOnly ? "This drive \u2713" : "All drives";
+  }
 
   // ------------------------------------------------------------ bottom sheet (mobile)
   var sheet = $("sheet");
@@ -144,7 +152,8 @@
     $("sheetH").textContent = "Looking for spaces…";
     $("plist").innerHTML = "";
     var d;
-    try { d = await A.spaces({ lat: lat, lon: lon, radius_m: RADIUS, limit: 500 }); }
+    var q = S.jobOnly ? { lat: lat, lon: lon, radius_m: 20000, job_id: S.job, limit: 2000 } : { lat: lat, lon: lon, radius_m: RADIUS, limit: 500 };
+    try { d = await A.spaces(q); }
     catch (e) { $("sheetH").textContent = "Could not load spaces"; $("plist").innerHTML = '<li class="err">' + esc(e.message) + "</li>"; return; }
     S.rows = (d.spaces || []).filter(function (s) { return s.lat != null && s.lon != null; });
     S.rows.forEach(function (s) { s._d = dist(lat, lon, s.lat, s.lon); });
@@ -165,9 +174,10 @@
     });
     var free = S.rows.filter(function (s) { return s.state === "free"; }).sort(function (a, b) { return a._d - b._d; });
     var rest = rows.filter(function (s) { return s.state !== "free"; }).sort(function (a, b) { return a._d - b._d; });
+    var where = S.jobOnly ? " from this drive" : " nearby";
     $("sheetH").innerHTML = free.length
-      ? '<span class="nfree">' + free.length + "</span> free " + (free.length === 1 ? "space" : "spaces") + " nearby"
-      : "No free spaces seen nearby";
+      ? '<span class="nfree">' + free.length + "</span> free " + (free.length === 1 ? "space" : "spaces") + where
+      : "No free spaces seen" + where;
     var html = free.map(row).join("");
     if (rest.length) html += '<li class="sub">Also nearby</li>' + rest.slice(0, 12).map(row).join("");
     $("plist").innerHTML = html;
@@ -244,7 +254,8 @@
 
   function wireCard(s, d) {
     $("closeCard").addEventListener("click", closeCard);
-    UI.media($("cardMedia"), (d && d.evidence_uri) || s.evidence_uri, d && d.mark, d && d.evidence_start, d && d.evidence_end, { autoplay: true });
+    UI.media($("cardMedia"), (d && d.evidence_uri) || s.evidence_uri, d && d.mark, d && d.evidence_start, d && d.evidence_end,
+      { keyframe: UI.keyframe(d, s), word: UI.markWord(d, s) });
     $("fb").addEventListener("click", function (e) {
       var b = e.target.closest("button[data-v]");
       if (!b) return;
@@ -288,6 +299,7 @@
     if (!g) { $("area").hidden = false; $("area").textContent = "Couldn't find “" + place + "”"; return; }
     closeCard();
     setSnap("peek");
+    S.jobOnly = false; paintJobChip();
     load(g.lat, g.lon, "Near " + g.label.replace(/ \(from receipts\)$/, ""), 17.5);
   });
   $("nearMe").addEventListener("click", function () {
@@ -307,6 +319,10 @@
   $("filterBack").addEventListener("click", function () { openFilter(false); });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("filterSheet").hidden) openFilter(false); });
   ["showOcc", "showOther"].forEach(function (id) { $(id).addEventListener("change", draw); });
+  $("jobChip").addEventListener("click", function () {
+    S.jobOnly = !S.jobOnly; paintJobChip(); closeCard();
+    if (S.centre) load(S.centre[0], S.centre[1], S.jobOnly ? "" : S.label);
+  });
   map.on("click", function () {
     if (!$("cardView").hidden) closeCard();
     else if (!wide.matches && snapName !== "peek") setSnap("peek");
@@ -316,10 +332,11 @@
   setSnap("peek", true);
   A.init().then(async function () {
     setSnap("peek", true);
-    var qs = new URLSearchParams(location.search);
+    paintJobChip();
+    var qs = QS;
     if (qs.get("lat") && qs.get("lon")) { load(+qs.get("lat"), +qs.get("lon"), "", 17.5); return; }
     var all = [];
-    try { all = ((await A.spaces({ limit: 5000 })).spaces || []).filter(function (s) { return s.lat != null && s.lon != null; }); } catch (e) { all = []; }
+    try { all = ((await A.spaces(S.job ? { job_id: S.job, limit: 5000 } : { limit: 5000 })).spaces || []).filter(function (s) { return s.lat != null && s.lon != null; }); } catch (e) { all = []; }
     if (!all.length) { load(43.6532, -79.4017, "", 17); return; }
     var free = all.filter(function (s) { return s.state === "free"; });
     var pool = free.length ? free : all;
@@ -328,6 +345,6 @@
     map.invalidateSize();
     var pad = wide.matches ? { padding: [50, 50] } : { paddingTopLeft: [24, topH() + 16], paddingBottomRight: [24, snaps().peek + 16] };
     map.fitBounds(all.map(function (s) { return [s.lat, s.lon]; }), Object.assign({ maxZoom: 18 }, pad));
-    load(lat, lon, "Demo area" + (pool[0].street ? " · " + pool[0].street : ""));
+    load(lat, lon, S.job ? "" : "Demo area" + (pool[0].street ? " · " + pool[0].street : ""));
   });
 })();

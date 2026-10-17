@@ -45,9 +45,16 @@ def is_test(row):
     return str(row.get("receipt_text") or "").startswith("TEST:")
 
 
+def job_of(row):
+    """Upload job that wrote this receipt (space_id up_<job_id>_...), else None."""
+    sid = str(row.get("space_id") or "")
+    return sid.split("_", 2)[1] if sid.startswith("up_") and sid.count("_") >= 2 else None
+
+
 def public(row):
-    """A row as sent to the browser: no embedding vector, plus a TEST flag."""
+    """A row as sent to the browser: no embedding vector, plus a TEST flag and the upload job id."""
     out = {k: v for k, v in row.items() if k != "embedding"}
+    out["job_id"] = job_of(row)
     out["has_embedding"] = row.get("embedding") is not None
     out["is_test"] = is_test(row)
     return out

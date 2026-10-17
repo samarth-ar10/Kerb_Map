@@ -110,7 +110,8 @@
   // ------------------------------------------------------------------ map: spaces, search, receipt, overrule
   function pvFilter(o) {
     var rows = P.spaces.filter(function (s) {
-      return (!o.state || s.state === o.state) && (!o.side || s.side === o.side) && (!o.source || s.source === o.source);
+      return (!o.state || s.state === o.state) && (!o.side || s.side === o.side) && (!o.source || s.source === o.source) &&
+        (!o.job_id || s.original_video === PV_JOB_VIDEO);
     }).map(function (s) { return Object.assign({}, s); });
     if (o.lat != null && o.lon != null && o.lat !== "" && o.lon !== "") {
       rows = rows.filter(function (s) { return s.lat != null && s.lon != null; });
@@ -136,7 +137,7 @@
       var rows = pvFilter(o);
       return { count: rows.length, spaces: rows, query_explain: "PREVIEW: no database query ran. Live query: " + describe(o) };
     }
-    var url = "api/spaces" + qs({ lat: o.lat, lon: o.lon, radius_m: o.radius_m, state: o.state, side: o.side, source: o.source, limit: o.limit || 500 });
+    var url = "api/spaces" + qs({ lat: o.lat, lon: o.lon, radius_m: o.radius_m, state: o.state, side: o.side, source: o.source, job_id: o.job_id, limit: o.limit || 500 });
     var d = await get(url);
     d.query_explain = d.query_explain || ("GET " + url + "  ->  " + describe(o));
     return d;
@@ -256,6 +257,7 @@
       evidence_uri: it.evidence_url || it.evidence_uri || null,
       clip_start: it.clip_start != null ? it.clip_start : it.t_start,
       clip_end: it.clip_end != null ? it.clip_end : it.t_end,
+      keyframe: it.keyframe != null ? it.keyframe : (it.t_in_clip != null ? it.t_in_clip : (it.evidence_start_s != null ? it.evidence_start_s : null)),
       mark: mark,
       model_state: it.model_state || null,
       street: it.street || null, side: it.side || null, source: it.source || null, split: it.split || null,
@@ -416,6 +418,102 @@
     return post("api/feedback", body);
   };
 
+  // ------------------------------------------------------------------ on-stage upload flow
+  // POST api/upload multipart {file, gps?, sample_id?} -> {job_id}
+  // GET  api/upload/{job_id} -> {job_id, state: uploading|uploaded|indexing|processing|done|error,
+  //        steps:[{name, status, at, detail}], filename, segments_found,
+  //        receipts_by_state:{free, occupied, not_space, cannot_tell}, center:{lat, lon}|null, message}
+  // GET  api/upload/latest-done -> {job_id}            (optional: the prepared fallback)
+  // GET  api/samples -> {samples:[{sample_id, label}]} (optional: the "Use a sample clip" list)
+  var PV_JOB_VIDEO = "set01_video_0002";
+  var UPLOAD_STEPS = ["Upload to VAST", "Indexed by VAST (YOLO + Cosmos)", "Kerb analysis", "Saved to VastDB"];
+  K.UPLOAD_STEPS = UPLOAD_STEPS;
+  var PVJOBS = {};
+
+  K.samples = async function () {
+    if (K.isPreview()) return [{ sample_id: "pv_sample_1", label: "PREVIEW sample: Toronto drive, Augusta Ave", preview: true }];
+    try {
+      var d = await get("api/samples", 5000);
+      return Array.isArray(d) ? d : (d && d.samples) || [];
+    } catch (e) { return []; }
+  };
+
+  // onProgress(fraction 0..1) reports the browser-to-server upload; resolves {job_id}
+  K.upload = function (file, gps, sampleId, onProgress) {
+    if (K.isPreview()) {
+      var id = "pv_job_" + Date.now().toString(36);
+      PVJOBS[id] = { t0: Date.now(), filename: file ? file.name : (sampleId ? "PREVIEW sample clip" : "clip.mp4"),
+        fail: new URLSearchParams(location.search).get("fail") === "1" };
+      var f = 0;
+      return new Promise(function (resolve) {
+        var h = setInterval(function () {
+          f = Math.min(1, f + 0.25);
+          if (onProgress) onProgress(f);
+          if (f >= 1) { clearInterval(h); resolve({ job_id: id, preview: true }); }
+        }, 250);
+      });
+    }
+    return new Promise(function (resolve, reject) {
+      var fd = new FormData();
+      if (file) fd.append("file", file);
+      if (gps) fd.append("gps", gps);
+      if (sampleId) fd.append("sample_id", sampleId);
+      var x = new XMLHttpRequest();
+      x.open("POST", "api/upload");
+      x.responseType = "json";
+      if (x.upload && onProgress) x.upload.onprogress = function (e) { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+      x.onload = function () {
+        var d = x.response;
+        if (typeof d === "string") { try { d = JSON.parse(d); } catch (e) { d = null; } }
+        if (x.status >= 200 && x.status < 300 && d && d.job_id) resolve(d);
+        else { var err = new Error((d && (d.detail || d.message)) || ("Upload failed (HTTP " + x.status + ")")); err.status = x.status; reject(err); }
+      };
+      x.onerror = function () { reject(new Error("Upload failed: network error")); };
+      x.send(fd);
+    });
+  };
+
+  function pvJob(id) {
+    var j = PVJOBS[id];
+    if (!j) { j = PVJOBS[id] = { t0: Date.now() - 60000, filename: "PREVIEW clip.mp4", fail: false }; }
+    var el = (Date.now() - j.t0) / 1000, per = 3;           // one step every 3 s in preview
+    var n = Math.floor(el / per);                            // steps finished
+    var states = ["uploaded", "indexing", "processing", "processing", "done"];
+    var steps = UPLOAD_STEPS.map(function (name, i) {
+      var at = new Date(j.t0 + (i + 1) * per * 1000).toISOString().replace(/\.\d+Z$/, "Z");
+      if (j.fail && i === 1 && n >= 1) return { name: name, status: "error", at: at, detail: "PREVIEW: simulated failure" };
+      if (j.fail && i > 1 && n >= 1) return { name: name, status: "pending", at: null, detail: "" };
+      return { name: name, status: i < n ? "done" : i === n ? "running" : "pending", at: i < n ? at : null,
+        detail: i < n ? "PREVIEW" : "" };
+    });
+    var rows = P.spaces.filter(function (s) { return s.original_video === PV_JOB_VIDEO && s.lat != null; });
+    var done = n >= UPLOAD_STEPS.length && !j.fail;
+    var by = { free: 0, occupied: 0, not_space: 0, cannot_tell: 0 };
+    rows.forEach(function (s) { by[s.state] = (by[s.state] || 0) + 1; });
+    var lat = rows.reduce(function (a, s) { return a + s.lat; }, 0) / (rows.length || 1);
+    var lon = rows.reduce(function (a, s) { return a + s.lon; }, 0) / (rows.length || 1);
+    return {
+      job_id: id, preview: true, filename: j.filename,
+      state: j.fail && n >= 1 ? "error" : states[Math.min(n, states.length - 1)],
+      steps: steps,
+      segments_found: n >= 2 && !j.fail ? rows.length : null,
+      receipts_by_state: done ? by : null,
+      center: done && rows.length ? { lat: lat, lon: lon } : null,
+      message: j.fail && n >= 1 ? "PREVIEW: indexing failed (simulated with ?fail=1)" : (done ? "PREVIEW job finished" : "")
+    };
+  }
+
+  K.uploadStatus = async function (id) {
+    if (K.isPreview() || /^pv_job_/.test(id)) { if (!P) await loadPreview(); return pvJob(id); }
+    return get("api/upload/" + encodeURIComponent(id), 8000);
+  };
+
+  K.latestDone = async function () {
+    if (K.isPreview()) return { job_id: "pv_job_prepared", preview: true };
+    try { var d = await get("api/upload/latest-done", 5000); return d && d.job_id ? d : null; }
+    catch (e) { return null; }
+  };
+
   // ------------------------------------------------------------------ measured
   // GET api/measured -> {rows:[{measure, split:'dev'|'heldout', light:'day'|'night', value, k, n, unit:'ratio'|'m'}],
   //                      search_compare:[{q, before:{label, results:[{space_id, state, street, score}]}, after:{...}}], source?, generated_at?}
@@ -486,50 +584,156 @@
       });
       return current;
     },
-    // Media box: video/image with the box or point drawn on top. Placeholder when there is no playable evidence.
+    // Keyframe for a receipt: seconds into the evidence file where the box was measured.
+    // Dashcam (dc_): gate step evidence_start_s / t (seconds into the 5 s segment file).
+    // pie-receipts (pr_) and others: t_sec, which is also seconds into the segment when evidence_uri is a segment file.
+    keyframe: function (d, s) {
+      s = s || (d && d.space) || {};
+      var trail = (d && d.trail) || [];
+      for (var i = 0; i < trail.length; i++) {
+        var det = parseDetail(trail[i]);
+        if (det.evidence_start_s != null && isFinite(+det.evidence_start_s)) return +det.evidence_start_s;
+        if (trail[i].step === "gate" && det.t != null && isFinite(+det.t)) return +det.t;
+      }
+      var uri = (d && d.evidence_uri) || s.evidence_uri || "";
+      var t = s.t_sec != null ? +s.t_sec : null;
+      if (t != null && /_segment_/.test(uri) && t >= 0 && t <= 5.5) return t;
+      if (t != null && uri && uri === s.original_video) return t;
+      if (d && d.evidence_start != null) return +d.evidence_start;
+      return t != null && t >= 0 ? t : 0;
+    },
+    // What the box marks, from the geometry step ("gap", "car") or the state.
+    markWord: function (d, s) {
+      var trail = (d && d.trail) || [];
+      for (var i = 0; i < trail.length; i++) {
+        var det = parseDetail(trail[i]);
+        if (trail[i].step === "geometry" && det.kind) return det.kind === "gap" ? "gap" : det.kind === "car" ? "parked car" : String(det.kind);
+      }
+      s = s || (d && d.space) || {};
+      return s.state === "occupied" ? "parked car" : s.state === "free" ? "gap" : "kerb stretch";
+    },
+    // Evidence box. A video loads PAUSED at the keyframe; the box is drawn on a canvas over the rendered video
+    // content (object-fit: contain letterboxing included), scaled from the frame size the box was measured in
+    // (mark.frame_size, default 1920x1080). "Play clip" plays around the keyframe; the box shows only within
+    // +/-0.15 s of it, and pausing returns to the keyframe.
+    // opts: {keyframe, word, autoplay (label page: play once after the first draw), controls}
     media: function (el, uri, mark, start, end, opts) {
       opts = opts || {};
-      var m = K.isPreview() ? null : K.media(uri, start, end);
-      var fs = (mark && mark.frame_size) || [1920, 1080];
-      var svg = "";
-      if (mark) {
-        var sw = Math.max(4, fs[0] / 260);
-        if (mark.box) {
-          var b = mark.box;
-          svg = '<rect x="' + b[0] + '" y="' + b[1] + '" width="' + (b[2] - b[0]) + '" height="' + (b[3] - b[1]) +
-            '" fill="none" stroke="#00e5ff" stroke-width="' + sw + '"/><rect x="' + b[0] + '" y="' + b[1] + '" width="' + (b[2] - b[0]) + '" height="' + (b[3] - b[1]) +
-            '" fill="none" stroke="#000" stroke-opacity=".5" stroke-width="' + (sw / 3) + '" stroke-dasharray="' + sw * 3 + '"/>';
-        } else if (mark.point) {
-          var p = mark.point, r = fs[0] / 60;
-          svg = '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + r + '" fill="none" stroke="#00e5ff" stroke-width="' + sw + '"/>' +
-            '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + sw + '" fill="#00e5ff"/>';
-        }
-        svg = '<svg class="mark" viewBox="0 0 ' + fs[0] + " " + fs[1] + '" preserveAspectRatio="xMidYMid meet" aria-hidden="true">' + svg + "</svg>";
+      var kf = opts.keyframe != null ? +opts.keyframe : (start != null ? +start : 0);
+      var m = K.isPreview() ? null : K.media(uri, null, null);
+      var fs = (mark && mark.frame_size && mark.frame_size.length === 2) ? mark.frame_size : [1920, 1080];
+      var word = opts.word || "gap";
+      function clock(t) {
+        t = Math.max(0, t || 0);
+        var h = Math.floor(t / 3600), mi = Math.floor(t / 60) % 60, s = t - h * 3600 - mi * 60;
+        return String(h).padStart(2, "0") + ":" + String(mi).padStart(2, "0") + ":" + (s < 10 ? "0" : "") + s.toFixed(1);
       }
       var inner;
       if (!m) {
         inner = '<div class="ph"><div>' + (K.isPreview() ? "Preview: no footage loaded" : "No evidence frame") +
           (uri ? '<span class="mono">' + esc(uri) + "</span>" : "") + "</div></div>";
       } else if (m.kind === "video") {
-        inner = '<video src="' + esc(m.url) + '" muted playsinline preload="metadata" ' + (opts.autoplay ? "autoplay " : "") + (opts.controls === false ? "" : "controls") + "></video>";
+        inner = '<video src="' + esc(m.url) + '" muted playsinline preload="auto" disablepictureinpicture></video>';
       } else {
         inner = '<img src="' + esc(m.url) + '" alt="Evidence frame">';
       }
-      el.innerHTML = inner + svg;
-      var media = el.querySelector("video, img");
-      if (media) media.addEventListener("error", function () {
-        el.innerHTML = '<div class="ph"><div>Evidence could not be loaded<span class="mono">' + esc(uri) + "</span></div></div>" + svg;
-      });
-      var v = el.querySelector("video");
-      if (v && start != null && end != null) {
-        v.addEventListener("timeupdate", function () { if (v.currentTime >= end) v.pause(); });
+      el.innerHTML = inner + '<canvas class="markcv" aria-hidden="true"></canvas>' +
+        '<div class="mcap">' + (mark ? "Box shows the " + esc(word) + " at " + clock(kf) : "No box recorded for this receipt") + "</div>" +
+        (m && m.kind === "video" ? '<button type="button" class="mplay" aria-label="Play clip">▶ Play clip</button>' : "");
+      var cv = el.querySelector("canvas.markcv");
+      var v = el.querySelector("video"), img = el.querySelector("img"), btn = el.querySelector(".mplay");
+      var ready = !m || (!v && !img), playEnd = null, raf = 0;
+
+      function contentRect() {
+        var W = el.clientWidth, H = el.clientHeight, iw, ih;
+        if (v) { iw = v.videoWidth; ih = v.videoHeight; }
+        else if (img) { iw = img.naturalWidth; ih = img.naturalHeight; }
+        if (!iw || !ih) { iw = fs[0]; ih = fs[1]; }
+        var sc = Math.min(W / iw, H / ih), dw = iw * sc, dh = ih * sc;
+        return { x: (W - dw) / 2, y: (H - dh) / 2, w: dw, h: dh, W: W, H: H };
       }
+      function draw(show) {
+        var r = contentRect(), dpr = window.devicePixelRatio || 1;
+        cv.width = Math.round(r.W * dpr); cv.height = Math.round(r.H * dpr);
+        cv.style.width = r.W + "px"; cv.style.height = r.H + "px";
+        var g = cv.getContext("2d");
+        g.setTransform(dpr, 0, 0, dpr, 0, 0);
+        g.clearRect(0, 0, r.W, r.H);
+        if (!mark || !show || !ready) return;
+        var sx = r.w / fs[0], sy = r.h / fs[1], lw = Math.max(2.5, r.w / 220);
+        g.lineWidth = lw;
+        if (mark.box) {
+          var b = mark.box, x = r.x + b[0] * sx, y = r.y + b[1] * sy, w = (b[2] - b[0]) * sx, h = (b[3] - b[1]) * sy;
+          g.strokeStyle = "rgba(0,0,0,.6)"; g.lineWidth = lw + 2; g.strokeRect(x, y, w, h);
+          g.strokeStyle = "#00e5ff"; g.lineWidth = lw; g.strokeRect(x, y, w, h);
+        } else if (mark.point) {
+          var px = r.x + mark.point[0] * sx, py = r.y + mark.point[1] * sy, rad = Math.max(10, r.w / 40);
+          g.strokeStyle = "#00e5ff"; g.beginPath(); g.arc(px, py, rad, 0, Math.PI * 2); g.stroke();
+          g.fillStyle = "#00e5ff"; g.beginPath(); g.arc(px, py, lw, 0, Math.PI * 2); g.fill();
+        }
+      }
+      function near() { return v ? Math.abs(v.currentTime - kf) <= 0.15 : true; }
+      function tick() {
+        if (!v || v.paused) return;
+        if (playEnd != null && v.currentTime >= playEnd) { v.pause(); return; }
+        draw(near());
+        raf = requestAnimationFrame(tick);
+      }
+      var autoDone = false;
+      function arrived() {
+        ready = true; draw(true);
+        if (opts.autoplay && !autoDone) { autoDone = true; setTimeout(function () { api.play(); }, 700); }
+      }
+      function toKeyframe() {
+        if (!v) { draw(true); return; }
+        var dur = isFinite(v.duration) ? v.duration : null;
+        var t = dur != null ? Math.min(Math.max(0, kf), Math.max(0, dur - 0.04)) : Math.max(0, kf);
+        if (Math.abs(v.currentTime - t) < 0.01) { arrived(); return; }
+        v.addEventListener("seeked", function once() { v.removeEventListener("seeked", once); arrived(); });
+        try { v.currentTime = t; } catch (e) { /* ignore */ }
+      }
+      var api = {
+        play: function () {
+          if (!v) return;
+          var dur = isFinite(v.duration) ? v.duration : kf + 3;
+          var from = start != null && start <= kf ? +start : Math.max(0, kf - 2);
+          playEnd = end != null && end > kf ? Math.min(+end, dur) : Math.min(dur, kf + 3);
+          draw(false);
+          try { v.currentTime = from; } catch (e) { /* ignore */ }
+          var p = v.play();
+          if (p && p.catch) p.catch(function () { /* autoplay refused */ });
+        },
+        redraw: function () { draw(!v || v.paused ? true : near()); }
+      };
+      el._kerbMedia = api;
+      if (v) {
+        v.addEventListener("loadedmetadata", toKeyframe);
+        v.addEventListener("play", function () { if (btn) btn.textContent = "❚❚ Pause"; cancelAnimationFrame(raf); raf = requestAnimationFrame(tick); });
+        v.addEventListener("pause", function () { if (btn) btn.textContent = "▶ Play clip"; cancelAnimationFrame(raf); toKeyframe(); });
+        v.addEventListener("ended", function () { if (btn) btn.textContent = "▶ Play clip"; toKeyframe(); });
+        if (btn) btn.addEventListener("click", function () { if (v.paused) api.play(); else v.pause(); });
+      }
+      if (img) img.addEventListener("load", function () { ready = true; draw(true); });
+      var media = v || img;
+      if (media) media.addEventListener("error", function () {
+        ready = false;
+        var ph = document.createElement("div");
+        ph.className = "ph";
+        ph.innerHTML = "<div>Evidence could not be loaded<span class=\"mono\">" + esc(uri) + "</span></div>";
+        media.replaceWith(ph);
+        if (btn) btn.remove();
+        draw(false);
+      });
+      if (typeof ResizeObserver !== "undefined") {
+        var ro = new ResizeObserver(function () { if (!el.isConnected) { ro.disconnect(); return; } api.redraw(); });
+        ro.observe(el);
+      } else window.addEventListener("resize", api.redraw);
+      window.addEventListener("orientationchange", function () { setTimeout(api.redraw, 250); });
+      draw(true);
       return v;
     },
-    replay: function (el, start) {
-      var v = el.querySelector("video");
-      if (!v) return;
-      try { v.currentTime = start != null ? start : 0; v.play(); } catch (e) { /* ignore */ }
+    replay: function (el) {
+      if (el && el._kerbMedia) el._kerbMedia.play();
     }
   };
 

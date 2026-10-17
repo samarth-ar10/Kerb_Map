@@ -526,3 +526,75 @@ details.why summary { list-style: none; gap: 8px; }
 details.why summary::-webkit-details-marker { display: none; }
 details.why summary::before { content: "\25B8"; }
 details.why[open] summary::before { content: "\25BE"; }
+
+/* ---- on-stage flow: connect, upload, progress (mobile first) ---- */
+.btn.ghostbtn { background: var(--surface); color: var(--ink); border: 2px solid var(--line); }
+a.btn.wide { display: flex; align-items: center; justify-content: center; text-align: center; }
+.step.stepdone .sn { background: var(--streetcam); color: #04150f; }
+.connected { display: flex; gap: 12px; align-items: center; padding: 12px; border-radius: 12px; background: var(--surface-2); }
+.connected div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.connected b { font-size: 1.1rem; }
+.connected span:not(.okdot) { color: var(--muted); font-size: .92rem; }
+.connected.small { margin-bottom: 14px; background: var(--surface); box-shadow: var(--shadow); }
+.okdot { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--streetcam); color: #04150f; font-weight: 900; }
+.pick { position: relative; display: flex; align-items: center; gap: 14px; min-height: 96px; padding: 16px; margin-bottom: 12px; border-radius: 16px;
+  border: 2px dashed var(--line); background: var(--surface); cursor: pointer; }
+.pick.small { min-height: 68px; }
+.pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.pick.chosen { border-style: solid; border-color: var(--free); }
+.pick:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
+.pickicon { flex: none; width: 48px; height: 48px; border-radius: 12px; display: grid; place-items: center; background: var(--surface-2); font-size: 1.2rem; font-weight: 800; }
+.pick.chosen .pickicon, .sample.on .pickicon { background: var(--free); color: var(--on-free); }
+.picktext { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.picktext b { font-size: 1.15rem; overflow-wrap: anywhere; }
+.picktext span { color: var(--muted); font-size: .9rem; }
+h2.minor { font-size: 1rem; margin: 18px 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.samples { display: grid; gap: 8px; }
+.sample { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 8px 12px; border-radius: 14px; border: 2px solid var(--line);
+  background: var(--surface); color: var(--ink); font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
+.sample.on { border-color: var(--free); }
+.bottombar { position: sticky; bottom: 0; margin: 18px -16px 0; padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  background: linear-gradient(to bottom, transparent, var(--bg) 30%); }
+.jobfile { font-size: 1.15rem; font-weight: 700; margin: 4px 0 12px; overflow-wrap: anywhere; }
+.upbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.upbar .bar { flex: 1; height: 12px; border-radius: 6px; background: var(--surface-2); overflow: hidden; }
+.upbar .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+.upbar b { font-variant-numeric: tabular-nums; min-width: 3.5em; text-align: right; }
+.psteps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.ps { display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: 14px; background: var(--surface); box-shadow: var(--shadow); min-height: 72px; }
+.pi { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; font-size: 1.2rem;
+  border: 3px solid var(--line); color: var(--muted); }
+.ps-done .pi { background: var(--streetcam); border-color: var(--streetcam); color: #04150f; }
+.ps-error .pi { background: var(--bad); border-color: var(--bad); color: #fff; }
+.ps-running .pi { border-color: var(--surface-2); border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
+.ps-pending { opacity: .6; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ps-running .pi { animation: none; border-color: var(--accent); } }
+.pt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pt b { font-size: 1.1rem; }
+.pd { color: var(--muted); font-size: .92rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+#results { margin-top: 16px; }
+.segs { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.segs b { font-size: 2.4rem; font-variant-numeric: tabular-nums; }
+.segs span { color: var(--muted); font-weight: 700; }
+.rstates { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.rs { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); }
+.rs b { font-size: 1.6rem; font-variant-numeric: tabular-nums; }
+.rs span:last-child { color: var(--muted); font-size: .9rem; font-weight: 600; }
+.errbox { margin-top: 16px; padding: 16px; border-radius: 14px; border: 2px solid var(--bad); background: var(--surface); display: grid; gap: 10px; }
+.errbox b { font-size: 1.2rem; color: var(--bad); }
+.errbox p { margin: 0; }
+.elapsed { text-align: center; color: var(--muted); margin: 8px 0 0; font-variant-numeric: tabular-nums; }
+.chipbtn.jobchip.on { background: var(--ink); color: var(--bg); }
+@media (min-width: 600px) {
+  .rstates { grid-template-columns: repeat(4, 1fr); }
+  .bottombar .btn.wide { max-width: 420px; margin: 0 auto; }
+}
+.sbody .btn { line-height: 30px; }
+/* evidence: box overlay canvas, caption, play button */
+.media canvas.markcv { position: absolute; left: 0; top: 0; pointer-events: none; }
+.media .mcap { position: absolute; left: 8px; top: 8px; max-width: calc(100% - 16px); background: rgba(0,0,0,.72); color: #fff;
+  font-size: .8rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; font-variant-numeric: tabular-nums; pointer-events: none; }
+.media .mplay { position: absolute; right: 8px; bottom: 8px; min-height: 44px; padding: 0 14px; border: 0; border-radius: 999px;
+  background: rgba(0,0,0,.72); color: #fff; font-weight: 800; font-size: .95rem; cursor: pointer; }
+.media .mplay:focus-visible { outline: 3px solid #00e5ff; }

@@ -94,7 +94,11 @@ check "api/labels/export" "$BASE/api/labels/export?split=dev" '"frozen_sha256"'
 check "api/replay/drives" "$BASE/api/replay/drives" '"drive_id"'
 check "api/replay/status" "$BASE/api/replay/status" '"active":false'
 check "api/spaces as_of"  "$BASE/api/spaces?as_of=0" '"mode":"replay"'
-for path in api/measured preview-data.json api/live api/coverage api/geocode?q=x; do
+check "api/upload/samples" "$BASE/api/upload/samples" '"sample_id":"2"'
+check "api/spaces job_id" "$BASE/api/spaces?job_id=0123456789" '"count":0'
+code=$(curl -s -o /dev/null -w "%{http_code}" -F "sample_id=nope" -F "file=@$REPO/query/samples_gps.json" "$BASE/api/upload")
+[ "$code" = 400 ] && ok "api/upload rejects an unknown sample (400)" || fail "api/upload unknown sample returned $code"
+for path in api/upload/0123456789 api/measured preview-data.json api/live api/coverage api/geocode?q=x; do
   code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/$path")
   [ "$code" = 404 ] && ok "$path -> 404 (not shipped / not built yet)" || fail "$path returned $code, expected 404"
 done
