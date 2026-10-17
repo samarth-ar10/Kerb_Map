@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kerb Map · Label</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="label">
+<div class="lbar">
+  <div class="brand"><h1><span>K</span>Label</h1></div>
+  <div class="prog" aria-label="Batch progress"><div class="bar"><i id="pbar" style="width:0"></i></div><b id="ptext">0/0</b></div>
+  <span class="me" id="me"></span>
+  <span class="pending" id="pending" hidden></span>
+  <nav class="nav" aria-label="Pages">
+    <a href="index.html" data-keep>Home</a>
+    <a href="board.html" data-keep>Board</a>
+    <button class="icon-btn" id="theme" type="button" aria-label="Switch theme">Dark</button>
+  </nav>
+</div>
+<div id="banner" class="banner" role="status" hidden></div>
+
+<main class="lstage">
+  <div class="media" id="ev"></div>
+  <div class="lmeta">
+    <span class="model" id="model"></span>
+    <span class="muted" id="where"></span>
+    <span id="itemTag"></span>
+  </div>
+  <div class="big4" id="big4">
+    <button type="button" class="s-free" data-l="free">FREE<kbd>F</kbd></button>
+    <button type="button" class="s-occupied" data-l="occupied">OCCUPIED<kbd>O</kbd></button>
+    <button type="button" class="s-not_space" data-l="not_space">NOT A SPACE<kbd>N</kbd></button>
+    <button type="button" class="s-cannot_tell" data-l="cannot_tell">CAN'T TELL<kbd>C</kbd></button>
+  </div>
+  <div class="reasons" id="reasons" hidden></div>
+  <form class="notebox" id="notebox" hidden><input id="note" maxlength="300" placeholder="Note" autocomplete="off"><button class="btn" type="submit">Keep</button></form>
+  <div class="keys">
+    <button type="button" id="kSkip"><kbd>S</kbd> skip</button>
+    <button type="button" id="kUndo"><kbd>U</kbd> undo</button>
+    <button type="button" id="kReplay"><kbd>Space</kbd> replay</button>
+    <button type="button" id="kNote"><kbd>T</kbd> note</button>
+  </div>
+</main>
+
+<div class="overlay" id="nameCard" hidden>
+  <form class="card" id="nameForm">
+    <h2>Your name</h2>
+    <input id="name" maxlength="40" autocomplete="off" required>
+    <button class="btn" type="submit">Start</button>
+  </form>
+</div>
+
+<div class="overlay" id="doneCard" hidden>
+  <div class="card">
+    <h2>Batch done</h2>
+    <div class="stats3">
+      <div><b id="dItems">0</b><span>items</span></div>
+      <div><b id="dMin">0</b><span>minutes</span></div>
+      <div><b id="dAgree">–</b><span>agree w/ model</span></div>
+    </div>
+    <button class="btn" id="nextBatch" type="button">Next batch</button>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+<script src="api.js"></script>
+<script src="label.js"></script>
+</body>
+</html>
