@@ -1,0 +1,108 @@
+{
+  "sf_streets_cam-5": {
+    "position_status": "uncertain",
+    "max_error_m": 20.842381287030506,
+    "leave_one_out_m": [
+      null,
+      null,
+      null,
+      null
+    ],
+    "check": [
+      {
+        "id": "east_crossing",
+        "error_m": 20.842381287030506
+      }
+    ],
+    "stretches": {
+      "right_curb": {
+        "lat": 37.79778149128173,
+        "lon": -122.4067283498314,
+        "length_m": 0.28830322713143597,
+        "street": "Columbus Avenue",
+        "street_distance_m": 8.018830264138252,
+        "vertices": [
+          [
+            37.797781920494785,
+            -122.40672511757774
+          ],
+          [
+            37.79778149128173,
+            -122.4067283498314
+          ]
+        ]
+      },
+      "left_curb": {
+        "lat": 37.79778066874122,
+        "lon": -122.40673457228252,
+        "length_m": 2.4239749428080968,
+        "street": "Columbus Avenue",
+        "street_distance_m": 8.573775651968505,
+        "vertices": [
+          [
+            37.79777713090464,
+            -122.40676176310858
+          ],
+          [
+            37.79778066874122,
+            -122.40673457228252
+          ]
+        ]
+      }
+    },
+    "max_error_limit_m": 2.0
+  },
+  "nyc_streets_cam-1": {
+    "position_status": "uncertain",
+    "max_error_m": 3.3346402841327594,
+    "leave_one_out_m": [
+      null,
+      null,
+      null,
+      null
+    ],
+    "check": [
+      {
+        "id": "south_crossing",
+        "error_m": 3.3346402841327594
+      }
+    ],
+    "stretches": {
+      "right_curb": {
+        "lat": 40.71855210426708,
+        "lon": -74.0023944667251,
+        "length_m": 4.638719471081317,
+        "street": "Walker Street",
+        "street_distance_m": 6.845944567790358,
+        "vertices": [
+          [
+            40.71858301368347,
+            -74.0024313396197
+          ],
+          [
+            40.71855210426708,
+            -74.0023944667251
+          ]
+        ]
+      },
+      "left_curb": {
+        "lat": 40.718682296147946,
+        "lon": -74.00248997394434,
+        "length_m": 13.235738473006196,
+        "street": "Broadway",
+        "street_distance_m": 1.1025817694494038,
+        "vertices": [
+          [
+            40.71870062092272,
+            -74.00264497425171
+          ],
+          [
+            40.718682296147946,
+            -74.00248997394434
+          ]
+        ]
+      }
+    },
+    "max_error_limit_m": 2.0
+  }
+}
