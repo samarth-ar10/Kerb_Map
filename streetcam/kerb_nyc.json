@@ -8,49 +8,83 @@
     "width": 1920,
     "height": 1080
   },
-  "notes": "Same corner in both VID clips, so one drawing. Polygons are in detection pixels (1920x1080) on VID_20261006_171812 chunk 0015 segment 4 at 1.0 s. The right strip is the curb at the right edge of the frame. The left strip is the curb along the 401 Broadway sidewalk. Legality is unknown. The lane is the intersection.",
+  "notes": "Redrawn 2026-10-17 from the image geometry (three frames: clip 171812 at 16 s and 451 s, clip 174811 at 301 s). Both old strips were on footways: left covered the far sidewalk in front of 401 Broadway (bikes, newspaper boxes) above the curb line; right covered the corner sidewalk where people stand. left (far curb): the curb line runs from (180,680) to (980,640) and on to about (1450,617); the strip is 15 px behind it to 55 px in front (the kerb-side lane), x 180 to 1450 (the corner pole). right: the kerb lane past the right corner, where the white box truck stands (box bottom y 690-707 at x 1780-1790 in both clips); strip y 665-730, x 1600 to the frame edge. The camera framing drifts by up to about 50 px between and within clips, so the strips are wider than one lane. Scale 58.75 px/m (bus box) kept. Legality unknown. Occupancy is position-based (parked.py).",
   "kerb_strips": [
     {
       "id": "right",
       "polygon": [
         [
-          1620,
-          690
+          1600,
+          665
+        ],
+        [
+          1919,
+          670
         ],
         [
           1919,
           730
         ],
         [
-          1919,
-          810
+          1600,
+          725
+        ]
+      ],
+      "centerline": [
+        [
+          1600,
+          695
         ],
         [
-          1620,
-          770
+          1919,
+          700
         ]
-      ]
+      ],
+      "px_per_m": 58.75
     },
     {
       "id": "left",
       "polygon": [
         [
           180,
-          580
+          665
         ],
         [
           980,
-          540
+          625
+        ],
+        [
+          1450,
+          602
+        ],
+        [
+          1450,
+          672
         ],
         [
           980,
-          640
+          695
         ],
         [
           180,
-          680
+          735
         ]
-      ]
+      ],
+      "centerline": [
+        [
+          180,
+          700
+        ],
+        [
+          980,
+          660
+        ],
+        [
+          1450,
+          637
+        ]
+      ],
+      "px_per_m": 58.75
     }
   ],
   "legal_stretches": [
@@ -60,12 +94,12 @@
       "legal": "unknown",
       "centerline": [
         [
-          1620,
-          730
+          1600,
+          695
         ],
         [
           1919,
-          770
+          700
         ]
       ],
       "px_per_m": 58.75
@@ -77,11 +111,15 @@
       "centerline": [
         [
           180,
-          610
+          700
         ],
         [
           980,
-          590
+          660
+        ],
+        [
+          1450,
+          637
         ]
       ],
       "px_per_m": 58.75
@@ -135,5 +173,19 @@
       "px_per_m": 58.75,
       "used_for": "coarse scale for both curb centerlines; the bus is angled, so lengths are approximate"
     }
-  ]
+  ],
+  "occupancy": {
+    "cell_m": 1.0,
+    "window_s": 120,
+    "min_fraction": 0.6,
+    "stitch_gap_s": 3.0,
+    "stitch_px": 30,
+    "parked_overlap_s": 120,
+    "vehicle_labels": [
+      "car",
+      "truck",
+      "bus",
+      "motorcycle"
+    ]
+  }
 }

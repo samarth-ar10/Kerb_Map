@@ -24,32 +24,98 @@ os.chdir(ROOT)
 from common.kerb_schema import validate_row
 from common import kerbdb
 
+sys.path.insert(0, str(ROOT / "streetcam"))
+import geo  # noqa: E402
+
 STILL_S = 120
 WINDOW_PX = 25
+
+POSITION_RULE = (
+    "A kerb cell (~1 m) is occupied when vehicle box bottoms on this kerb strip cover it "
+    "in at least 60% of frames over a 120 s window, whatever the track id; "
+    "a parked period lasts at least 120 s."
+)
+# all three cameras now use the position-based parked.py (kerb cells)
+RULES = {cam: POSITION_RULE for cam in ("neighborhood_cam-1", "sf_streets_cam-5", "nyc_streets_cam-1")}
+STILL_RULE = (
+    f"A car is parked only if its centre stays inside {WINDOW_PX:.0f} px for more than {STILL_S} s "
+    "and its box bottom is on this kerb strip."
+)
 
 GEO = {
     "neighborhood_cam-1": {
         "lat": None,
         "lon": None,
         "place": "unknown (private neighbourhood camera)",
+        "geo_source": "unknown",
+        "spec": None,
     },
     "sf_streets_cam-5": {
         "lat": 37.798,
         "lon": -122.40666,
         "place": "Broadway & Columbus Ave, San Francisco (Condor Club, 560 Broadway, in view)",
+        "geo_source": "landmark_estimate",
+        "spec": ROOT / "streetcam/geo_sf.json",
     },
     "nyc_streets_cam-1": {
         "lat": 40.71878,
         "lon": -74.00255,
         "place": "Broadway & Walker St, Manhattan (401 Broadway and Walker St sign in view)",
+        "geo_source": "landmark_estimate",
+        "spec": ROOT / "streetcam/geo_nyc.json",
     },
 }
 
+# Map positions (streetcam/geo.py, apply_geo.py rules). The projected kerb line is the
+# stretch line in geo_<city>.json, not the redrawn occupancy strip in kerb_<city>.json.
+# length_m stays the occupancy strip length (the state rule uses it); the projected
+# length is recorded as map_length_m in the receipt and the position trail step.
+GEO_MAX_USE_M = 15.0  # a fit whose held-out check is over this does not move the row
+
+
+def fit_geo():
+    fits = {}
+    for cam, g in GEO.items():
+        if g["spec"] and Path(g["spec"]).exists():
+            fits[cam] = geo.fit_camera(json.loads(Path(g["spec"]).read_text()))
+    return fits
+
+
+def position_for(cam: str, stretch_id: str, fit):
+    """Return (lat, lon, street, position_status, map_length_m, check_m, note)."""
+    g = GEO[cam]
+    if fit is None:
+        return (g["lat"], g["lon"], g["place"], "uncertain", None, None,
+                "No map position: video_geo.csv has no lat/lon for this camera.")
+    check = fit["check"][0]["error_m"] if fit["check"] else None
+    st = (fit["stretches"] or {}).get(stretch_id)
+    use = (st is not None and check is not None and check < GEO_MAX_USE_M
+           and 1.0 <= st["length_m"] <= 40.0)
+    if use:
+        status = fit["position_status"]  # ok only when the check is under geo.MAX_ERROR_M (2 m)
+        return (st["lat"], st["lon"], st["street"], status, st["length_m"], check,
+                f"Map {st['lat']:.6f},{st['lon']:.6f} on {st['street']}, map_length_m {st['length_m']:.3f}. "
+                f"position_status {status}. Held-out check {check:.2f} m (ok only under 2 m).")
+    return (g["lat"], g["lon"], g["place"], "uncertain", st["length_m"] if st else None, check,
+            f"Homography check {check:.2f} m, over 2 m, so this row keeps the video_geo.csv point "
+            f"and position_status uncertain." if check is not None else
+            "No held-out check point, so position_status uncertain.")
+
+
+# Paths come from the environment so the script runs on any machine:
+#   KERB_WORK          detection work dir (default ~/kerb-work); index under KERB_WORK/dets
+#   KERB_DET_ROOT      overrides KERB_WORK/dets
+#   KERB_BACKEND_FILE  file holding the backend URL (default KERB_WORK/backend)
+#   KERB_TOKEN_FILE    file holding the token (default KERB_WORK/token)
+#   RECEIPT_CACHE      scratch dir for downloaded segments and raw frames (default /tmp/receipt-video)
+#   STREETCAM_CAMERAS  comma list of camera ids to write (default all three)
+WORK = Path(os.environ.get("KERB_WORK") or (Path.home() / "kerb-work"))
+DET_ROOT = Path(os.environ.get("KERB_DET_ROOT") or (WORK / "dets"))
+
 
 def load_auth():
-    home = Path.home() / "kerb-work"
-    backend = (home / "backend").read_text().strip().rstrip("/")
-    token = (home / "token").read_text().strip()
+    backend = Path(os.environ.get("KERB_BACKEND_FILE") or (WORK / "backend")).read_text().strip().rstrip("/")
+    token = Path(os.environ.get("KERB_TOKEN_FILE") or (WORK / "token")).read_text().strip()
     return backend, token
 
 
@@ -158,41 +224,62 @@ def extract_jpg(mp4: Path, jpg: Path, ss: float) -> bool:
     return proc.returncode == 0 and jpg.exists()
 
 
-def state_for(row, stretch) -> tuple[str, str]:
+def state_for(row, stretch, gap_m: float) -> tuple[str, str]:
+    """State from the occupied/free metres of this 10 s window.
+
+    occupied when any metres of the stretch are occupied (the reason still gives the
+    largest unoccupied gap, and free_m is recorded); free only when nothing is occupied
+    and an unoccupied gap of at least gap_m (one car length, 5.5 m) exists; cannot_tell
+    when nothing is occupied but the stretch is shorter than one car length.
+    """
+    free = [(a, b) for a, b in (row.get("free_m") or [])]
+    occ = row.get("occupied_m") or []
     ids = row.get("parked_track_ids") or []
-    if ids:
-        return "occupied", "parked " + ",".join(ids)
     legal = stretch.get("legal") or "hand_marked"
-    if legal == "unknown":
-        return "free", "legality unknown"
-    return "free", "no parked car on the hand-marked legal stretch"
+    tail = "legality unknown" if legal == "unknown" else "hand-marked legal stretch"
+    widest = max(free, key=lambda g: g[1] - g[0]) if free else None
+    gap_txt = (f"widest unoccupied gap {widest[1] - widest[0]:.2f} m at {widest[0]:.2f}-{widest[1]:.2f} m"
+               if widest else "no unoccupied gap")
+    if occ:
+        why = f"occupied metres {occ}; {gap_txt}"
+        if ids:
+            why += "; parked " + ",".join(ids)
+        return "occupied", why + f"; {tail}"
+    if widest and widest[1] - widest[0] >= gap_m - 1e-9:
+        return "free", f"nothing occupied; {gap_txt} (>= {gap_m} m); {tail}"
+    return "cannot_tell", (f"nothing occupied, but the stretch ({float(row['length_m']):.2f} m) is shorter "
+                           f"than one car length ({gap_m} m); {tail}")
 
 
 def main():
-    backend, token = load_auth()
+    auth = None
     cameras = [
         {
             "camera_id": "neighborhood_cam-1",
             "kerb": ROOT / "streetcam/kerb_neighborhood.json",
             "timeline": ROOT / "streetcam/out/occupancy_timeline.jsonl",
-            "index_root": Path.home() / "kerb-work/dets",
+            "index_root": DET_ROOT,
         },
         {
             "camera_id": "sf_streets_cam-5",
             "kerb": ROOT / "streetcam/kerb_sf.json",
             "timeline": ROOT / "streetcam/out/sf/occupancy_timeline.jsonl",
-            "index_root": Path.home() / "kerb-work/dets/sf_streets_cam-5",
+            "index_root": DET_ROOT / "sf_streets_cam-5",
         },
         {
             "camera_id": "nyc_streets_cam-1",
             "kerb": ROOT / "streetcam/kerb_nyc.json",
             "timeline": ROOT / "streetcam/out/nyc/occupancy_timeline.jsonl",
-            "index_root": Path.home() / "kerb-work/dets/nyc_streets_cam-1",
+            "index_root": DET_ROOT / "nyc_streets_cam-1",
         },
     ]
     spaces, observations, trails = [], [], []
     counts = {}
-    cache = Path("/tmp/receipt-video")
+    fits = fit_geo()
+    cache = Path(os.environ.get("RECEIPT_CACHE") or "/tmp/receipt-video")
+    want = [c for c in (os.environ.get("STREETCAM_CAMERAS") or "").split(",") if c]
+    if want:
+        cameras = [c for c in cameras if c["camera_id"] in want]
     for cam in cameras:
         kerb = json.loads(cam["kerb"].read_text())
         stretches = {s["id"]: s for s in kerb["legal_stretches"]}
@@ -204,7 +291,7 @@ def main():
             if day not in indexes:
                 indexes[day] = json.loads((cam["index_root"] / day / "index.json").read_text())
             stretch = stretches[row["stretch_id"]]
-            state, reason = state_for(row, stretch)
+            state, reason = state_for(row, stretch, float(kerb.get("free_gap_m", 5.5)))
             chunk, seg, seg_t = locate(indexes[day], float(row["time_s"]))
             key = (cam["camera_id"], day, chunk["chunk_index"])
             rel = Path("streetcam/out/receipts") / cam["camera_id"] / f"{day}_chunk_{int(chunk['chunk_index']):04d}.jpg"
@@ -221,6 +308,8 @@ def main():
                         raw_jpg = prior[0]
                         ok = True
                 if not ok:
+                    auth = auth or load_auth()
+                    backend, token = auth
                     if download_segment(backend, token, seg["source"], mp4):
                         ok = extract_jpg(mp4, raw_jpg, 1.0)
                         mp4.unlink(missing_ok=True)
@@ -232,15 +321,16 @@ def main():
                     made[key] = ""
             evidence = made[key]
             space_id = f"{cam['camera_id']}_{day}_{row['stretch_id']}_t{int(row['time_s'])}"
-            geo = GEO[cam["camera_id"]]
+            lat, lon, street, pos_status, map_len, check_m, pos_note = position_for(
+                cam["camera_id"], row["stretch_id"], fits.get(cam["camera_id"]))
             when = clock(day, float(row["time_s"]))
             receipt = (
                 f"{cam['camera_id']} {day} {row['stretch_id']} at chunk-timeline {row['time_s']} s "
                 f"({chunk['filename']} segment {seg['segment_number']} + {seg_t:.1f} s). "
                 f"State {state}: {reason}. Length {row['length_m']} m. "
                 f"Occupied metres {row['occupied_m']}. Free metres {row['free_m']}. "
-                f"A car is parked only if its centre stays inside {WINDOW_PX:.0f} px for more than {STILL_S} s "
-                f"and its box bottom is on this kerb strip."
+                + RULES.get(cam["camera_id"], STILL_RULE)
+                + " " + pos_note
             )
             space = {
                 "space_id": space_id,
@@ -253,10 +343,10 @@ def main():
                 "state": state,
                 "reason": reason,
                 "confidence": None,
-                "lat": geo["lat"],
-                "lon": geo["lon"],
-                "position_status": "uncertain",
-                "street": geo["place"],
+                "lat": lat,
+                "lon": lon,
+                "position_status": pos_status,
+                "street": street,
                 "length_m": float(row["length_m"]),
                 "last_seen": when,
                 "evidence_uri": evidence,
@@ -274,9 +364,16 @@ def main():
                 "confidence": None,
             }
             details = [
-                ("boxes", {"segment_file": seg["file"], "stretch_id": row["stretch_id"], "occupied_m": row["occupied_m"]}),
-                ("track", {"parked_track_ids": row.get("parked_track_ids") or [], "still_window_px": WINDOW_PX, "still_s": STILL_S}),
-                ("rule", {"text": "parked if still inside 25 px for more than 120 s and the box bottom is on the kerb strip; driveway is not_space; lane is traffic", "reason": reason}),
+                ("boxes", {"segment_file": seg["file"], "stretch_id": row["stretch_id"], "occupied_m": row["occupied_m"], "free_m": row["free_m"]}),
+                ("track", {"parked_track_ids": row.get("parked_track_ids") or [], **(
+                    {"occupancy": kerb.get("occupancy")} if cam["camera_id"] in RULES
+                    else {"still_window_px": WINDOW_PX, "still_s": STILL_S})}),
+                ("rule", {"text": RULES.get(cam["camera_id"], STILL_RULE) + " Driveway is not_space; lane is traffic. "
+                          "Any occupied metres make the window occupied; it is free only if nothing is occupied and a gap of at least free_gap_m exists.", "reason": reason,
+                          "free_gap_m": float(kerb.get("free_gap_m", 5.5)), "free_m": row["free_m"]}),
+                ("position", {"note": pos_note, "position_status": pos_status, "lat": lat, "lon": lon,
+                              "street": street, "length_m": float(row["length_m"]), "map_length_m": map_len,
+                              "check_error_m": check_m}),
             ]
             for n, (step, detail) in enumerate(details, start=1):
                 trails.append({
@@ -292,38 +389,54 @@ def main():
             bucket = counts.setdefault(cam["camera_id"], {"spaces": 0, "free": 0, "occupied": 0, "frames": 0})
             bucket["spaces"] += 1
             bucket[state] = bucket.get(state, 0) + 1
+            bucket["position_" + pos_status] = bucket.get("position_" + pos_status, 0) + 1
         counts[cam["camera_id"]]["frames"] = len({v for v in made.values() if v})
+
+    cam_rows = []
+    for cam in cameras:
+        cid = cam["camera_id"]
+        g, fit = GEO[cid], fits.get(cid)
+        cam_rows.append(validate_row("kerb_cameras", {
+            "camera_id": cid, "kind": "street_camera", "lat": g["lat"], "lon": g["lon"], "heading": None,
+            "place": g["place"], "geo_source": g["geo_source"], "geo_confidence": None,
+            "check_error_m": (fit["check"][0]["error_m"] if fit and fit["check"] else None),
+        }))
 
     out = ROOT / "streetcam/out"
     out.mkdir(parents=True, exist_ok=True)
-    for name, rows in (("kerb_spaces", spaces), ("kerb_observations", observations), ("kerb_trail", trails)):
+    (out / "geo_fit.json").write_text(json.dumps(fits, indent=2))
+    for name, rows in (("kerb_spaces", spaces), ("kerb_observations", observations), ("kerb_trail", trails),
+                       ("kerb_cameras", cam_rows)):
         path = out / f"{name}.jsonl"
         with path.open("w") as fh:
             for row in rows:
                 fh.write(json.dumps(row) + "\n")
         print(name, len(rows), path)
 
-    os.environ["KERB_DB"] = "local"
-    os.environ["KERB_SQLITE"] = str(Path.home() / "kerb-data" / "kerb.sqlite")
+    want_vastdb = os.environ.get("KERB_DB") == "vastdb"
+    os.environ.setdefault("KERB_SQLITE", str(Path.home() / "kerb-data" / "kerb.sqlite"))
     db = kerbdb.get_db("local")
     db.ensure_tables()
     # replace previous streetcam rows by writing a fresh sqlite if this is the streetcam copy
     db.insert("kerb_spaces", spaces)
     db.insert("kerb_observations", observations)
     db.insert("kerb_trail", trails)
+    db.insert("kerb_cameras", cam_rows)
     print("sqlite", os.environ["KERB_SQLITE"], "spaces", len(db.read("kerb_spaces", {"source": "streetcam"}, limit=100000)))
 
-    vastdb_status = "not_attempted"
-    try:
-        import vastdb  # noqa: F401
-        vdb = kerbdb.get_db("vastdb")
-        vdb.ensure_tables()
-        vdb.insert("kerb_spaces", spaces)
-        vdb.insert("kerb_observations", observations)
-        vdb.insert("kerb_trail", trails)
-        vastdb_status = "ok"
-    except Exception as exc:
-        vastdb_status = type(exc).__name__ + ": " + str(exc).split("\n")[0][:180]
+    vastdb_status = "not_attempted (set KERB_DB=vastdb to write VastDB)"
+    if want_vastdb:
+        try:
+            import vastdb  # noqa: F401
+            vdb = kerbdb.get_db("vastdb")
+            vdb.ensure_tables()
+            vdb.insert("kerb_spaces", spaces)
+            vdb.insert("kerb_observations", observations)
+            vdb.insert("kerb_trail", trails)
+            vdb.insert("kerb_cameras", cam_rows)
+            vastdb_status = "ok"
+        except Exception as exc:
+            vastdb_status = type(exc).__name__ + ": " + str(exc).split("\n")[0][:180]
     print("vastdb", vastdb_status)
     print("counts", json.dumps(counts))
 
