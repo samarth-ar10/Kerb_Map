@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kerb Map · Measured</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><h1><span>K</span>Kerb Map</h1><p>What we measured, with the count behind every number.</p></div>
+  <nav class="nav" aria-label="Pages">
+    <a href="index.html" data-keep>Home</a>
+    <a href="label.html" data-keep>Label</a>
+    <a href="board.html" data-keep>Board</a>
+    <a href="measured.html" data-keep aria-current="page">Measured</a>
+    <button class="icon-btn" id="theme" type="button" aria-label="Switch theme">Dark</button>
+  </nav>
+</header>
+<div id="banner" class="banner" role="status" hidden></div>
+<main class="page">
+  <h2>Results</h2>
+  <p class="muted">Frozen labels. Dev and held-out are separate; held-out is run once.</p>
+  <div class="table-wrap" id="table"><p class="muted">Loading…</p></div>
+  <p class="stamp" id="src"></p>
+
+  <h2>Search before and after the ingestion prompt</h2>
+  <div id="compare"><p class="muted">Loading…</p></div>
+</main>
+<script src="api.js"></script>
+<script>
+(function () {
+  "use strict";
+  var A = window.KerbAPI, UI = window.KerbUI, esc = A.esc;
+  UI.theme();
+  var COLS = [["dev", "day"], ["dev", "night"], ["heldout", "day"], ["heldout", "night"]];
+  var NM = '<span class="nm">not measured yet</span>';
+
+  function cell(r) {
+    if (!r || r.value == null) return NM;
+    var v = r.unit === "m" ? (+r.value).toFixed(1) + " m" : (+r.value).toFixed(2);
+    var kn = r.k != null && r.n != null ? r.k + " / " + r.n : (r.n != null ? "n = " + r.n : "count missing");
+    return '<span class="v">' + esc(v) + '</span><span class="kn">' + esc(kn) + "</span>";
+  }
+
+  function table(d) {
+    var rows = (d && d.rows) || [];
+    if (!rows.length) return '<p class="nm">Not measured yet.</p>';
+    var cols = COLS.filter(function (c) { return rows.some(function (r) { return r.split === c[0] && (r.light || "day") === c[1]; }); });
+    var extra = rows.some(function (r) { return !r.light; });
+    if (extra && !cols.length) cols = [["dev", "day"], ["heldout", "day"]];
+    var measures = [];
+    rows.forEach(function (r) { if (measures.indexOf(r.measure) < 0) measures.push(r.measure); });
+    var head = "<tr><th>Measure</th>" + cols.map(function (c) {
+      return "<th>" + (c[0] === "dev" ? "Dev" : "Held-out") + " · " + c[1] + "</th>";
+    }).join("") + (rows.some(function (r) { return r.target != null; }) ? "<th>Target</th>" : "") + "</tr>";
+    var body = measures.map(function (m) {
+      var mine = rows.filter(function (r) { return r.measure === m; });
+      var target = mine.find(function (r) { return r.target != null; });
+      return "<tr><th scope=\"row\">" + esc(m) + "</th>" + cols.map(function (c) {
+        var r = mine.find(function (x) { return x.split === c[0] && (x.light || "day") === c[1]; });
+        return '<td class="num">' + cell(r) + "</td>";
+      }).join("") + (rows.some(function (r) { return r.target != null; }) ? '<td class="num">' + (target ? esc(target.target) : "") + "</td>" : "") + "</tr>";
+    }).join("");
+    return '<table class="res"><thead>' + head + "</thead><tbody>" + body + "</tbody></table>";
+  }
+
+  function list(side) {
+    var res = (side && side.results) || [];
+    if (!res.length) return '<p class="nm">not measured yet</p>';
+    return "<ol>" + res.map(function (r) {
+      return "<li>" + UI.glyph(r.state) + " " + esc(r.street || r.space_id) + (r.score != null ? ' <span class="muted mono">' + esc(r.score) + "</span>" : "") + "</li>";
+    }).join("") + "</ol>";
+  }
+
+  function compare(d) {
+    var cs = (d && d.search_compare) || [];
+    if (!cs.length) return '<p class="nm">Not measured yet.</p>';
+    return cs.map(function (c) {
+      return '<p><b>Query:</b> <span class="mono">' + esc(c.q) + "</span></p>" +
+        '<div class="compare"><div class="col"><h3>Before · ' + esc((c.before && c.before.label) || "default prompt") + "</h3>" + list(c.before) +
+        '</div><div class="col"><h3>After · ' + esc((c.after && c.after.label) || "kerb prompt") + "</h3>" + list(c.after) + "</div></div>";
+    }).join("");
+  }
+
+  A.init().then(async function () {
+    var d = null;
+    try { d = await A.measured(); }
+    catch (e) { document.getElementById("src").innerHTML = '<span class="err">' + esc(e.message) + "</span>"; }
+    document.getElementById("table").innerHTML = table(d);
+    document.getElementById("compare").innerHTML = compare(d);
+    if (d && (d.source || d.generated_at)) document.getElementById("src").textContent = "Source: " + (d.source || "") + (d.generated_at ? " · " + d.generated_at : "");
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{
+ "read_spaces": 5302,
+ "read_trail": 31812,
+ "converted_spaces": 5302,
+ "observations": 5302,
+ "trail_rows": 31812,
+ "position_ok": 5302,
+ "position_uncertain": 0,
+ "dropped": {},
+ "states": {
+  "occupied": 4429,
+  "not_space": 851,
+  "free": 6,
+  "cannot_tell": 16
+ },
+ "sides": {
+  "L": 3714,
+  "R": 1588
+ },
+ "backend": "local"
+}

@@ -1,0 +1,23 @@
+{
+  "camera_id": "sf_streets_cam-5",
+  "frame": "streetcam/frame_sf.jpg",
+  "origin": {"lat": 37.7978752, "lon": -122.4066341, "osm_node": "330661310", "what": "Broadway and Columbus centre"},
+  "csv_landmark": {"lat": 37.798, "lon": -122.40666, "what": "Condor Club node, the video_geo.csv point, about 75 m class"},
+  "fit": [
+    {"id": "se_kerb", "osm_node": "7231121742", "what": "south-east kerb end of the zebra across Broadway, the near left sidewalk corner", "u": 390, "v": 695, "lat": 37.7978255, "lon": -122.4063903},
+    {"id": "ne_kerb", "osm_node": "7231121744", "what": "north-east kerb end of that zebra, where it meets the Condor-side curb", "u": 1200, "v": 630, "lat": 37.7979803, "lon": -122.4066377},
+    {"id": "sw_kerb", "osm_node": "7231121743", "what": "south-west kerb end of the zebra across Columbus", "u": 520, "v": 600, "lat": 37.7977800, "lon": -122.4067397},
+    {"id": "south_crossing", "osm_node": "4019577202", "what": "centre of the zebra on Columbus, south of the junction", "u": 640, "v": 700, "lat": 37.7977932, "lon": -122.4066384}
+  ],
+  "check": [
+    {"id": "east_crossing", "osm_node": "6514737762", "what": "centre of the near zebra across Broadway, held out of the fit", "u": 800, "v": 780, "lat": 37.7978936, "lon": -122.4064992}
+  ],
+  "stretches": {
+    "right_curb": [[1450, 662], [1919, 702]],
+    "left_curb": [[220, 630], [450, 582]]
+  },
+  "streets": [
+    {"name": "Broadway", "points": [[37.7978613, -122.4067424], [37.7978752, -122.4066341], [37.7978936, -122.4064992], [37.7979147, -122.4063252]]},
+    {"name": "Columbus Avenue", "points": [[37.7979642, -122.4068935], [37.7979717, -122.4067768], [37.7978752, -122.4066341], [37.7978070, -122.4065322], [37.7977932, -122.4066384]]}
+  ]
+}

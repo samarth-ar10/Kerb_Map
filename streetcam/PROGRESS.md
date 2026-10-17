@@ -117,7 +117,7 @@ From `streetcam/out/sf/occupancy_summary.json`: 5502 traffic, 1200 not_space, pa
 
 From `streetcam/out/nyc/occupancy_summary.json`: clip `20261006_171812` is 6694 traffic and 2298 not_space; clip `20261006_174811` is 7298 traffic and 2668 not_space. Parked ids are empty on both. No car, truck or bus track in either file lasts 90 s. Right curb 5.135 m, left curb 13.621 m, both at 58.75 px/m from a 705 px bus box taken as 12 m (the bus is angled).
 
-Drawings: `streetcam/kerb_sf.json`, `streetcam/kerb_nyc.json`, with `frame_sf.jpg`, `frame_nyc.jpg`, `kerb_sf_overlay.jpg` and `kerb_nyc_overlay.jpg`. Legality on those stretches is unknown, so an empty window is state `free` with reason `legality unknown`. Neighborhood stretches stay the hand-marked lengths (near 5.157 m, far 21.907 m) and use reason `no parked car on the hand-marked legal stretch`.
+Drawings: `streetcam/kerb_sf.json`, `streetcam/kerb_nyc.json`, with `frame_sf.jpg`, `frame_nyc.jpg`, `kerb_sf_overlay.jpg` and `kerb_nyc_overlay.jpg`. Legality on those stretches is unknown, so an empty window is state `free` with reason `legality unknown`. Neighborhood receipt rows follow the occupancy fix above: near stretch 6.172 m, far stretch 17.165 m. A window with parked track ids is `occupied`; an empty neighborhood window is `free` with reason `no parked car on the hand-marked legal stretch`. Of the 308 neighborhood rows, 81 are occupied (17 on 20260901, 64 on 20260902) and 227 are free.
 
 Receipt rows (`streetcam/out/kerb_spaces.jsonl`): neighborhood 308, SF 180, NYC 360, all `source=streetcam`, `side=view`, `position_status=uncertain`. Each row has `original_video`, `segment_number`, `t_sec`, `receipt_text` and a plate-blurred `evidence_uri` (one frame per chunk). Trail steps are `boxes`, `track` and `rule` (2544 rows).
 
@@ -146,3 +146,44 @@ Why SF and NYC were all free: the timelines in `out/sf`, `out/nyc` used the per-
 - Spot check (10 random receipts per camera, seed 20261017, evidence frame only, made before the state-rule change): neighbourhood 9 plausible / 0 implausible / 1 cannot tell; SF 1 / 8 / 1 (free receipts with a car standing in the strip); NYC 6 / 1 / 3.
 - Label checks (track-based, unchanged by the state rule): dev 34/40, held-out 45/51.
 - Loader: `~/load_streetcam.py` on the VM (copy of `~/load_receipts.py`, default snapshot the scratch SQLite, `--cameras` filter). Dry-run with `--cameras neighborhood_cam-1,nyc_streets_cam-1`: 668 spaces, 668 observations, 2004 trail rows, schema OK, VastDB not contacted.
+
+## Map positions
+
+`streetcam/geo.py` fits a homography from image pixels to local east/north metres. `position_status` is `ok` only when a held-out OpenStreetMap point comes back under 2 m. Reference points are zebra kerb-ends from OSM, not guessed corners.
+
+`data/video_geo.csv` (same figures as `~/Desktop/builder-b-pack/extra/video_geo.csv`):
+
+| Camera | lat, lon in the CSV | geo_source |
+|---|---|---|
+| neighborhood_cam-1 | empty | unknown |
+| sf_streets_cam-5 | 37.798, -122.40666 (the Condor Club node) | landmark_estimate, about 75 m |
+| nyc_streets_cam-1 | 40.71878, -74.00255 (401 Broadway) | landmark_estimate, about 75 m |
+
+neighborhood_cam-1 has no latitude. Its 308 space rows stay `lat`/`lon` null, `position_status` uncertain, street `unknown (private neighbourhood camera)`. They are not drawn on a map.
+
+San Francisco: four fit points and held-out node 6514737762 (centre of the zebra across Broadway). Check error 20.84 m. The projected curbs were not used. The 180 space rows stay on the Condor Club point, `position_status` uncertain.
+
+New York: four kerb corners of the Broadway/Walker crossing, held-out node 8307641759. Check error 3.33 m, so `position_status` is uncertain (the bar is 2 m). The 360 space rows now sit on the projected curb rather than the single CSV point:
+
+| Stretch | lat, lon | street | map length |
+|---|---|---|---|
+| right_curb | 40.718552, -74.002394 | Walker Street | 4.639 m |
+| left_curb | 40.718682, -74.002490 | Broadway | 13.236 m |
+
+`streetcam/out/kerb_cameras.jsonl` has one row per camera. `streetcam/out/geo_fit.json` has the check errors. Each space has a trail step `position`.
+
+## New York homography, second pass
+
+The west sidewalk edge on `frame_nyc.jpg` was measured again: for x=70 to x=210 the asphalt starts at y=663 to y=668. Moving the south-west fit point onto that edge raised the held-out error from 3.33 m to 4.45 m. Three other pixel sets scored 6.09 m, 5.86 m and 2.95 m (`streetcam/out/geo_nyc_refine.json`). None is under 2 m, so the original points and the uncertain New York coordinates are unchanged.
+
+## Merge: our occupancy and states + map positions (2026-10-17)
+
+`streetcam/combined` merged with `origin/streetcam/neighborhood-cam-1` (map positions and the second New York pass). Occupancy (`parked.py`, redrawn kerb strips, metres-based state rule, SF held back) is from the combined branch; `geo.py`, `apply_geo.py`, `geo_sf.json`, `geo_nyc.json` and their camera positions are unchanged from the map-position branch.
+
+- The map kerb line is the stretch line in `geo_<city>.json` (the earlier kerb drawing). Occupancy uses the redrawn strips in `kerb_<city>.json`. The two do not coincide yet.
+- `write_receipts.py` now fits each `geo_<city>.json` with `geo.fit_camera` and applies the `apply_geo.py` rules per row: a row moves to the projected stretch only when the held-out check is under 15 m; `position_status` is `ok` only under 2 m. `length_m` stays the occupancy strip length (used by the state rule); the projected length is `map_length_m` in the receipt text and in trail step 4 `position` (with `check_error_m`). It also writes `out/kerb_cameras.jsonl` and `kerb_cameras` in the SQLite file. `apply_geo.py` is no longer run separately.
+- Re-run on the lab VM into `~/kerb-data/streetcam/streetcam.sqlite` (KERB_DB=local; detections and evidence frames already there): 758 spaces, 758 observations, 3032 trail rows, 3 cameras. States unchanged: neighbourhood 308 (82 occupied, 226 free), NYC 360 (278 occupied, 79 free, 3 cannot_tell), SF 90 (35 occupied, 55 free, held back).
+- Positions: 0 `ok`. NYC 360 rows on the projected curbs, `uncertain` (check 3.33 m): right_curb on Walker Street (map 4.639 m, strip 5.430 m), left_curb on Broadway (map 13.236 m). SF 90 rows stay on the video_geo.csv point, `uncertain` (check 20.84 m). Neighbourhood 308 rows without lat/lon, `uncertain`.
+- SF held back as before: `out/sf/held_back/` now also holds its trail step 4 and its `kerb_cameras` row. Branch JSONL: 668 spaces, 668 observations, 2672 trail rows, 2 cameras.
+- Label checks re-run: dev 34/40, held-out 45/51.
+- Loader `~/load_streetcam.py` (VM): ids already in VastDB now get `lat`, `lon`, `position_status` updated (kerb_spaces) and `lat`, `lon`, `check_error_m` (kerb_cameras); new ids are inserted as before. Dry run with `--cameras neighborhood_cam-1,nyc_streets_cam-1`: 668 spaces (360 with lat/lon, all uncertain), 668 observations, 2672 trail rows, 2 cameras, schema OK, VastDB not contacted.
