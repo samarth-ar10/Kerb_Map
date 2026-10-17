@@ -18,20 +18,20 @@ Cheap checks run first. Cosmos is last, and only on the gaps those checks cannot
 2. **Street camera.** Draw the kerb once on a single frame. Track cars. A car is parked only if it sits on the kerb strip for longer than a light cycle, about two minutes. Cars in the lane are traffic. Write the occupied intervals and the metres in view.
 3. **Query.** Filter receipts by state and side, keep those near the pin, and attach the evidence. One receipt opens from the first gate to the final word.
 
-## What we already measured
+## How we will measure it
 
-Rehearsed on the public Toronto PIE dashcam set (85 minutes, 6 drives). Labels were frozen first. A fresh held-out set of 9 videos was run once.
+On the Toronto PIE dashcam drives in the library (public dataset, 6 drives). Labels are frozen before any model answer, and a held-out set is run once.
 
-| | Result |
+| | Target |
 |---|---|
-| Real legal space, when we answered | 0.84 (38/45) |
-| Free vs occupied, on those spaces | 0.895 (34/38) |
-| Right when we said "free" | 0.53 (8/15) |
-| Pin error, median | about 3 m |
-| Slots sent to Cosmos | 2.3% |
+| Real legal space, when we answer | 0.90 |
+| Free vs occupied, on those spaces | 0.85 |
+| Right when we say "free" | 0.80 |
+| Pin error, median | under 8 m |
+| Slots sent to Cosmos | under 5% |
 
-The false spaces were driveways, kerbs nobody parks on, a corner, and a hydrant. That "free" number is why the street camera is in the product.
+The traps are driveways, kerbs nobody parks on, corners and hydrants. A single dashcam pass is weakest on "free", which is why the street camera is in the product.
 
 ## What the footage allows
 
-The event library stores a location as one word, with no GPS and no clock. Boxes are already saved every 5 seconds, so the demo reads those boxes and does not re-process hours of video. A pin works when the dashcam file carries GPS, or when a street camera's position is set once by hand. The page reports the metres a camera covered, and no more.
+The event library stores a location as one word, with no GPS and no clock. YOLO boxes are already saved for every frame of every 5-second segment, so the demo reads those boxes and does not re-process hours of video. A pin works when the dashcam file carries GPS, or when a street camera's position is set once by hand. The page reports the metres a camera covered, and no more.

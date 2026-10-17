@@ -4,32 +4,30 @@ A person drops a pin or enters a postcode. The page shows each stretch of kerb n
 occupied, when was it last seen, and the evidence for that answer. Every answer is a **receipt**: the frames, the decision
 trail, and a confidence. "Cannot tell" and "not seen" are honest answers, never hidden.
 
-**Order of work today:** first rebuild, on the VAST event stack, the dashcam pipeline we designed and measured before the
-event (phase 1). Then add street cameras (phase 2). Then the postcode/pin query that merges both (phase 3).
-All code in this repo is written today. What we bring from before the event is the plan, the measurements, and the
-lessons below.
+**Order of work today:** first the dashcam pipeline on the Toronto PIE drives (phase 1). Then street cameras (phase 2).
+Then the postcode/pin query that merges both (phase 3).
 
-## 1. What we already know (measured before the event)
+## 1. Approach and targets
 
-We rehearsed this on the public Toronto PIE dashcam dataset (85 minutes, 6 drives) with YOLO11, kerb geometry,
-OpenStreetMap rules and NVIDIA Cosmos-Reason1-7B running locally. Labels were frozen before any model answer. A fresh
-held-out set (9 videos never used for tuning) was run once.
+The Toronto PIE dashcam drives in the library (public dataset, 6 drives) are the first source, with YOLO boxes, kerb
+geometry, OpenStreetMap rules and NVIDIA Cosmos. Labels are written and frozen before any model answer, and a held-out
+set is run once.
 
-| Measure (fresh held-out) | Result | Target |
-|---|---|---|
-| Is this a real legal kerb space? (precision on answered spots) | 0.84 (38/45) | 0.90 |
-| Free vs occupied, on real spaces answered | 0.895 (34/38) | 0.85 |
-| When it says "free", is it right? | 0.53 (8/15) | 0.80 |
-| Spaces found / free spaces found (recall) | 0.42 / 0.17 | - |
-| "Cannot tell" rate | 4.5% | under 25% |
-| Pin error (median) | about 3 m | under 8 m |
-| Cosmos calls | 2.3% of kerb slots, 76 GPU-s per camera-hour vs 2,600 for captioning everything | - |
+| Measure | Target |
+|---|---|
+| Is this a real legal kerb space? (precision on answered spots) | 0.90 |
+| Free vs occupied, on real spaces answered | 0.85 |
+| When it says "free", is it right? | 0.80 |
+| Spaces found / free spaces found (recall) | report it |
+| "Cannot tell" rate | under 25% |
+| Pin error (median) | under 8 m |
+| Share of kerb slots sent to Cosmos | under 5% |
 
-What this tells us:
-- **Occupied is easy, free is hard.** A single dashcam pass finds parked cars well but misses or mislabels free gaps.
-  That is why street cameras matter (phase 2): a fixed view watches the same kerb for minutes.
-- **The false spaces** were driveways (3 of 7), kerbs nobody parks on, a corner, a hydrant.
-- **Cheap first, Cosmos last** works: distance gate, then boxes, then geometry and rules, then Cosmos only on unclear gaps.
+Design choices:
+- **Occupied is easier than free.** A single dashcam pass sees parked cars well; an empty gap is easy to miss or to
+  confuse with a driveway. That is why street cameras matter (phase 2): a fixed view watches the same kerb for minutes.
+- **Watch for false spaces:** driveways, kerbs nobody parks on, corners, hydrants.
+- **Cheap first, Cosmos last:** distance gate, then boxes, then geometry and rules, then Cosmos only on unclear gaps.
 
 ## 2. Facts about the event data we must design around
 
@@ -38,8 +36,8 @@ What this tells us:
 - A **postcode or pin needs coordinates.** Dashcam clips only get them if GPS comes with the footage (PIE has it in its own
   files; ask the organisers if we may use it). A **street camera has one fixed location**, which we can set by hand once.
 - Re-ingest is slow. Start any re-ingest in the first hour, on a small batch. Never make the demo wait on it.
-- Cosmos on the event host is a different model from our rehearsal (`cosmos3` family). Re-check the prompt and the
-  confidence line on a few labelled spots before trusting it.
+- Check how the event's Cosmos model (`cosmos3` family) answers: thinking text, log probabilities, image input. Test the
+  prompt and the confidence line on a few labelled spots before trusting it.
 
 ## 3. The data model (one model for every source)
 
@@ -61,7 +59,7 @@ Stored in VastDB beside `vss-collection` (same schema):
 | `kerb_overrules` | person or agent correction, and which receipts it changed |
 | `kerb_eval_cases` | frozen label, used for measurement |
 
-## 4. Phase 1: rebuild the dashcam pipeline on the event stack
+## 4. Phase 1: the dashcam pipeline on the event stack
 
 | # | Step | Done when |
 |---|---|---|
@@ -99,22 +97,17 @@ One camera covers its near kerb well and loses the far end. Report the covered m
 - Newer sighting of the same metres wins. Street cameras refresh their stretch; dashcams fill other roads, then go stale.
 - Answer per road side: free count, metres seen, last seen, and a link to each receipt.
 
-## 7. What we tried before the event that did NOT work (don't repeat)
+## 7. Pitfalls to avoid
 
-- Distance from a single frame using a flat-road assumption, or a monocular depth model: too noisy to separate kerb,
-  driveway and lane.
-- Matching cars between keyframes 1 to 2 s apart without a tracker: parked cars looked like they moved.
-- Asking Cosmos "parked or traffic?" on the whole frame: cut recall badly. Ask about one boxed gap instead.
-- A zoomed kerb crop as a second look, "could you park here?", a three-frame clip, OSM driveway distance: no gain.
-- Captions alone for search: "free kerb space" search fails on captions. Filter on the receipt state first.
-
-- Tracking cars through a **dashcam** video to decide parked vs traffic: measured worse (precision 0.60 vs 0.83), because
-  cars queued at lights also stand still. Keep two parts as extra cues: road segmentation (spots cars on driveways) and
-  gaps measured across frames (finds more free spaces).
-
-For **street cameras** the same trap applies: a car at a red light stands still for 30 to 90 s. Parked means still for
-longer than a light cycle (about 2 minutes) **and** sitting on the kerb strip, not in a lane. A fixed camera can measure
-that duration; a passing dashcam cannot.
+- Distance from a single frame (flat-road assumption or a monocular depth model) is too noisy to separate kerb,
+  driveway and lane. Use the road geometry from OpenStreetMap and GPS.
+- Matching cars between keyframes far apart without a tracker makes parked cars look like they move.
+- Asking Cosmos "parked or traffic?" about a whole frame is too vague. Ask about one boxed gap.
+- Search on generic captions won't find "free kerb space". Filter on the receipt state first, then rank.
+- On a **dashcam**, "the car stood still" doesn't mean parked: cars queued at lights stand still too. Useful extra cues:
+  road segmentation (spots cars on driveways) and gaps measured across frames.
+- On **street cameras**, a car at a red light stands still for 30 to 90 s. Parked means still for longer than a light
+  cycle (about 2 minutes) **and** on the kerb strip, not in a lane. A fixed camera can measure that duration.
 
 ## 8. How we measure (judges ask for this)
 
