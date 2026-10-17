@@ -108,8 +108,13 @@ One camera covers its near kerb well and loses the far end. Report the covered m
 - A zoomed kerb crop as a second look, "could you park here?", a three-frame clip, OSM driveway distance: no gain.
 - Captions alone for search: "free kerb space" search fails on captions. Filter on the receipt state first.
 
-What is promising and still open: tracking cars through the video plus road segmentation (road vs sidewalk), which
-street cameras give us almost for free.
+- Tracking cars through a **dashcam** video to decide parked vs traffic: measured worse (precision 0.60 vs 0.83), because
+  cars queued at lights also stand still. Keep two parts as extra cues: road segmentation (spots cars on driveways) and
+  gaps measured across frames (finds more free spaces).
+
+For **street cameras** the same trap applies: a car at a red light stands still for 30 to 90 s. Parked means still for
+longer than a light cycle (about 2 minutes) **and** sitting on the kerb strip, not in a lane. A fixed camera can measure
+that duration; a passing dashcam cannot.
 
 ## 8. How we measure (judges ask for this)
 
@@ -134,6 +139,16 @@ parallel.
 
 Samarth also coordinates the plan, reviews merges, runs the human label check and checks every number before it goes on a slide
 (with an AI research assistant).
+
+**Cursor agents** do most of the typing. Each builder runs their own agents on the lab VM, and every task is a short prompt
+with a clear "done when" from the tables above.
+- **What they do:** write and run the code for their workstream; use the starter-kit skills (login, explore, detections,
+  re-ingest, VastDB read/write, deploy); split bigger tasks across sub-agents (e.g. one per PIE set or per camera);
+  write tests and a short note of what they ran and what came out.
+- **What they don't do:** invent numbers, labels or results; change frozen labels; re-ingest hours of video without the
+  team agreeing; print or copy credentials; push to `main` without a person reviewing.
+- **How we work with them:** one branch per workstream (`dashcam/…`, `streetcam/…`, `query/…`, `design/…`), small commits,
+  merge after a person checks the output against the "done when".
 
 ## 10. Privacy
 
