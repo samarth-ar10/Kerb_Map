@@ -121,11 +121,19 @@ street cameras give us almost for free.
 
 ## 9. Who does what
 
-| Who | Role |
-|---|---|
-| Cursor agents (use sub-agents) | Phase 1 steps 1 to 11, then phase 2 tracking |
-| Samarth | Bridge to Claude (planning, review, measurements), human label check, demo |
-| Teammate | Clip table and street-camera kerb drawing, facts and sources, README "built today vs brought in", pitch |
+Four people plus Cursor agents. One person designs; three build, each owning one workstream and driving their own
+Cursor agents (ask them to use sub-agents). Workstreams meet at the five VastDB tables in section 3, so they can run in
+parallel.
+
+| Who | Workstream | Owns | Done when |
+|---|---|---|---|
+| Builder A | Dashcam pipeline (phase 1, steps 1–8) | clip table, keyframes, stored boxes, kerb slots, rules, Cosmos check, position, receipts written to VastDB | PIE receipts in `kerb_spaces` with trails |
+| Builder B | Street cameras (phase 2) | car tracking from the stored per-frame boxes, kerb drawn on the neighbourhood camera, "stays still = parked", occupied intervals | neighbourhood camera writes intervals to the same tables |
+| Builder C | Query, agent and measurement (phase 1 steps 9–12, phase 3) | VastDB filter + semantic query, overrule loop, MCP tools and second agent, frozen labels and the results table | pin query returns receipts; results table in README |
+| Designer | Product and demo | map and receipt screens, the 3-minute demo flow, slides, demo video by 16:00 | demo clicks through end to end |
+
+Samarth also coordinates the plan, reviews merges, runs the human label check and checks every number before it goes on a slide
+(with an AI research assistant).
 
 ## 10. Privacy
 
