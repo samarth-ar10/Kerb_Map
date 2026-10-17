@@ -1,0 +1,38 @@
+{
+  "model": "nvidia/cosmos3-nano-reasoner",
+  "input": "image_url jpeg",
+  "thinking_text": false,
+  "logprobs": true,
+  "frames": [
+    {
+      "frame": "set01_chunk0000_seg01_t0.0.jpg",
+      "content": "OCCUPIED",
+      "reasoning_content": null,
+      "reasoning": null,
+      "logprob_tokens": 5,
+      "label": "CANNOT_TELL",
+      "confidence": 0.5265815769296783,
+      "raw": "OCCUPIED"
+    },
+    {
+      "frame": "set01_chunk0000_seg01_t1.0.jpg",
+      "content": "OCCUPIED",
+      "reasoning_content": null,
+      "reasoning": null,
+      "logprob_tokens": 5,
+      "label": "CANNOT_TELL",
+      "confidence": 0.5034858227999613,
+      "raw": "OCCUPIED"
+    },
+    {
+      "frame": "set01_chunk0000_seg01_t2.0.jpg",
+      "content": "FREE",
+      "reasoning_content": null,
+      "reasoning": null,
+      "logprob_tokens": 2,
+      "label": "FREE",
+      "confidence": 0.6598905620771416,
+      "raw": "FREE"
+    }
+  ]
+}

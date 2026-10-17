@@ -1,0 +1,139 @@
+{
+  "camera_id": "nyc_streets_cam-1",
+  "frame": {
+    "filename": "20261008_065055_VID_20261006_171812_002_chunk_0015.mp4",
+    "segment_number": 4,
+    "time_in_segment_s": 1.0,
+    "image": "frame_nyc.jpg",
+    "width": 1920,
+    "height": 1080
+  },
+  "notes": "Same corner in both VID clips, so one drawing. Polygons are in detection pixels (1920x1080) on VID_20261006_171812 chunk 0015 segment 4 at 1.0 s. The right strip is the curb at the right edge of the frame. The left strip is the curb along the 401 Broadway sidewalk. Legality is unknown. The lane is the intersection.",
+  "kerb_strips": [
+    {
+      "id": "right",
+      "polygon": [
+        [
+          1620,
+          690
+        ],
+        [
+          1919,
+          730
+        ],
+        [
+          1919,
+          810
+        ],
+        [
+          1620,
+          770
+        ]
+      ]
+    },
+    {
+      "id": "left",
+      "polygon": [
+        [
+          180,
+          580
+        ],
+        [
+          980,
+          540
+        ],
+        [
+          980,
+          640
+        ],
+        [
+          180,
+          680
+        ]
+      ]
+    }
+  ],
+  "legal_stretches": [
+    {
+      "id": "right_curb",
+      "kerb_id": "right",
+      "legal": "unknown",
+      "centerline": [
+        [
+          1620,
+          730
+        ],
+        [
+          1919,
+          770
+        ]
+      ],
+      "px_per_m": 58.75
+    },
+    {
+      "id": "left_curb",
+      "kerb_id": "left",
+      "legal": "unknown",
+      "centerline": [
+        [
+          180,
+          610
+        ],
+        [
+          980,
+          590
+        ]
+      ],
+      "px_per_m": 58.75
+    }
+  ],
+  "driveways": [],
+  "lane": {
+    "polygon": [
+      [
+        0,
+        500
+      ],
+      [
+        1600,
+        560
+      ],
+      [
+        1500,
+        1000
+      ],
+      [
+        0,
+        1040
+      ]
+    ]
+  },
+  "free_gap_m": 5.5,
+  "still_s": 120,
+  "references": [
+    {
+      "id": "crossing_car",
+      "what": "Car box on chunk 0005 segment 4, x 1141 to 1441, three-quarter view",
+      "pixels": 300,
+      "assumed_m": 4.8,
+      "px_per_m": 62.5,
+      "used_for": "not used for length; the car is not side-on"
+    },
+    {
+      "id": "right_edge_height",
+      "what": "Car box on the reference frame, y 384 to 705, cut off at the right edge",
+      "pixels": 321,
+      "assumed_m": 1.7,
+      "px_per_m": 188.8,
+      "used_for": "near-camera height scale only"
+    },
+    {
+      "id": "bus_box",
+      "what": "Bus box on the reference frame, x 1076 to 1781",
+      "pixels": 705,
+      "assumed_m": 12.0,
+      "px_per_m": 58.75,
+      "used_for": "coarse scale for both curb centerlines; the bus is angled, so lengths are approximate"
+    }
+  ]
+}
