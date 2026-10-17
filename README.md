@@ -8,11 +8,9 @@ The product sketch is [ONE-PAGER.md](ONE-PAGER.md). The build plan is [PLAN.md](
 
 Both pipelines read boxes that VSS already stored (YOLO11, confidence at least 0.4, no track ids). They do not re-run YOLO. They write the same tables through `common/kerbdb.py`. The app reads those tables, and falls back to the JSONL files the builders committed under `dashcam/out/` and `streetcam/out/`.
 
-![How a receipt is made. The library feeds a dashcam lane and a street-camera lane. Both write the same six tables, and a pin query reads them.](design/how-a-receipt-is-made.png)
+![Repo architecture. VSS feeds data, dashcam, and streetcam. Those write through common/kerbdb.py. query reads the tables and the JSONL. deploy ships the app.](design/repo-architecture.png)
 
-![What a receipt holds. A state, a side, a length, a position, when it was last seen, an evidence frame, and the decision trail. Free means legal, seen, and empty for about one car.](design/what-a-receipt-holds.png)
-
-A free space is a legal stretch a camera actually saw, empty for about one car length (5.5 m). A newer sighting of the same metres wins. Street cameras keep one stretch fresh. Dashcams cover other roads, then go stale. `position_status` is `ok` only when the check is under 2 m.
+A free space is a legal stretch a camera actually saw, empty for about one car length (5.5 m). A newer sighting of the same metres wins. Street cameras keep one stretch fresh. Dashcams cover other roads, then go stale. Dashcam `position_status` is `ok` when the keyframe has PIE GPS. Street-camera `position_status` is `ok` only when the held-out homography check is under 2 m.
 
 ### Dashcam (`pie_cam-3`, Toronto PIE)
 
@@ -44,7 +42,7 @@ Three fixed cameras. The kerb is drawn once, on one frame, in `kerb_neighborhood
 
 ### Query
 
-`query/api.py` serves the pages in `query/static/` and the JSON API. `query/store.py` reads the database. `query/sources.py` loads JSONL from `dashcam/out/` and `streetcam/out/` (or `KERB_JSONL_DIRS`). On the same key the database row wins. A bad JSONL line is skipped and counted on `GET /api/health`.
+`query/api.py` serves the pages in `query/static/` and the JSON API. `query/store.py` reads the database. `query/sources.py` loads JSONL from `dashcam/out/` and `streetcam/out/` (or `KERB_JSONL_DIRS`). On the same key the database row wins. A bad JSONL line is skipped and counted on `GET /api/health`. `query/mcp_server.py` exposes find, receipt, and overrule. `query/second_agent.py` calls those tools for the five questions in `query/agent_eval.md`.
 
 A pin query is a filter (state, side, source) plus a radius (`spaces_near`). Search then ranks those rows by cosine similarity. The embedder is Cosmos Embed1; `KERB_EMBEDDER=hash` is a test stand-in and is labelled as such in every response. Spaces with no lat/lon of their own are placed at their camera’s `kerb_cameras` position.
 
@@ -73,7 +71,7 @@ VastDB uses schema `kerbmap` in the team bucket (`KERB_VDB_SCHEMA` overrides it)
 | [`query/`](query/README.md) | Builder C. API, map and receipt pages, labelling, replay, and MCP tools. |
 | [`data/`](data/README.md) | GPS and place attached to every segment we use. `pie_map.csv` and `pie_segments.csv` are PIE’s own GPS, matched frame by frame. `video_geo.csv` is one row per segment for the dashcam and the three street cameras. |
 | [`design/`](design/README.md) | Prototype mock data for slides. It does not feed the app. |
-| [`deploy/`](query/DEPLOY.md) | Kubernetes manifest `k8s/kerbmap-app.yaml`. `query/build_deploy.py` writes a flat `deploy/app/` for the ConfigMap. Nothing in this folder has been applied to the cluster. |
+| [`deploy/`](query/DEPLOY.md) | Kubernetes manifest `k8s/kerbmap-app.yaml`. `query/build_deploy.py` writes a flat `deploy/app/` for the ConfigMap. `kerbmap-app` is already on the cluster. |
 
 Pages in `query/static/` (relative URLs only; `api.js` is the only file that calls the server):
 
