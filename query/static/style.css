@@ -1,39 +1,50 @@
 /* Kerb Map shared styles. All colours are tokens; dark theme redefines them. */
 :root {
   --bg: #f4f3ef;
-  --surface: #ffffff;
-  --surface-2: #ecebe6;
+  --surface: #fffefb;
+  --surface-2: #ebe9e0;
   --ink: #15181c;
-  --muted: #4a525b;
+  --muted: #4a4f55;
   --line: #d3d0c8;
-  --accent: #0b4f8a;
-  --accent-ink: #ffffff;
-  --focus: #0b4f8a;
+  --accent: #15181c;
+  --accent-ink: #f2c230;
+  --focus: #15181c;
   --kerb-a: #15181c;
   --kerb-b: #f2c230;
   --banner-bg: #fff2c2;
   --banner-ink: #4a3800;
   --ok: #0072b2;
   --bad: #b23a00;
-  /* state palette (Okabe-Ito based, colour-blind safe) */
+  /* NEW vars (chrome) */
+  --header-bg: #15181c;
+  --header-ink: #f4f3ef;
+  --header-muted: #b7bdc3;
+  --primary-bg: #15181c;
+  --primary-ink: #f4f3ef;
+  --primary-icon-bg: #f2c230;
+  --primary-icon-ink: #15181c;
+  --kerb-stripe: repeating-linear-gradient(90deg, var(--header-ink) 0 36px, var(--kerb-b) 36px 72px); /* header stripe: paper+yellow, readable on asphalt */
+  /* state palette (Okabe-Ito based, colour-blind safe), UNCHANGED */
   --free: #0072b2;
   --occupied: #d55e00;
   --not_space: #5b6168;
   --cannot_tell: #e69f00;
   --on-free: #ffffff;
-  --on-occupied: #ffffff;
+  --on-occupied: #1c0a00;
   --on-not_space: #ffffff;
   --on-cannot_tell: #1a1300;
   --streetcam: #009e73;
   --dashcam: #cc79a7;
-  --shadow: 0 1px 2px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.06);
+  --shadow: 0 1px 2px rgba(21,24,28,.08), 0 4px 16px rgba(21,24,28,.07);
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #101317; --surface: #191e24; --surface-2: #222830; --ink: #eef1f4; --muted: #aab3bd; --line: #333b45;
-    --accent: #6cb4ff; --accent-ink: #0b1420; --focus: #8fc6ff; --kerb-a: #eef1f4; --kerb-b: #e0b225;
+    --bg: #121416; --surface: #1b1e21; --surface-2: #272a2e; --ink: #f4f3ef; --muted: #b7bbbf; --line: #383c40;
+    --accent: #f2c230; --accent-ink: #15181c; --focus: #f2c230; --kerb-a: #f4f3ef; --kerb-b: #f2c230;
     --banner-bg: #3a3000; --banner-ink: #ffe9a3; --ok: #56b4e9; --bad: #ff8a50;
+    --header-bg: #0b0c0e; --header-ink: #f4f3ef; --header-muted: #b7bbbf;
+    --primary-bg: #f2c230; --primary-ink: #15181c; --primary-icon-bg: #15181c; --primary-icon-ink: #f2c230;
     --free: #56b4e9; --occupied: #f0793a; --not_space: #9aa3ad; --cannot_tell: #f0c24a;
     --on-free: #08131c; --on-occupied: #1c0a00; --on-not_space: #0f1215; --on-cannot_tell: #1a1300;
     --streetcam: #2fc79a; --dashcam: #e39bc4; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 20px rgba(0,0,0,.35);
@@ -41,9 +52,11 @@
   }
 }
 :root[data-theme="dark"] {
-  --bg: #101317; --surface: #191e24; --surface-2: #222830; --ink: #eef1f4; --muted: #aab3bd; --line: #333b45;
-  --accent: #6cb4ff; --accent-ink: #0b1420; --focus: #8fc6ff; --kerb-a: #eef1f4; --kerb-b: #e0b225;
+  --bg: #121416; --surface: #1b1e21; --surface-2: #272a2e; --ink: #f4f3ef; --muted: #b7bbbf; --line: #383c40;
+  --accent: #f2c230; --accent-ink: #15181c; --focus: #f2c230; --kerb-a: #f4f3ef; --kerb-b: #f2c230;
   --banner-bg: #3a3000; --banner-ink: #ffe9a3; --ok: #56b4e9; --bad: #ff8a50;
+  --header-bg: #0b0c0e; --header-ink: #f4f3ef; --header-muted: #b7bbbf;
+  --primary-bg: #f2c230; --primary-ink: #15181c; --primary-icon-bg: #15181c; --primary-icon-ink: #f2c230;
   --free: #56b4e9; --occupied: #f0793a; --not_space: #9aa3ad; --cannot_tell: #f0c24a;
   --on-free: #08131c; --on-occupied: #1c0a00; --on-not_space: #0f1215; --on-cannot_tell: #1a1300;
   --streetcam: #2fc79a; --dashcam: #e39bc4; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 20px rgba(0,0,0,.35);
@@ -605,3 +618,14 @@ h2.minor { font-size: 1rem; margin: 18px 0 8px; color: var(--muted); text-transf
 .media .mplay:focus-visible { outline: 3px solid #00e5ff; }
 
 .howline { margin: 8px 0 0; color: var(--muted); font-size: .88rem; }
+
+/* OPTIONAL-COMPONENT-OVERRIDES (append after the app's rules; 5 tiny rules use the new vars) */
+.top { background: var(--header-bg); color: var(--header-ink); }
+.top .brand p { color: var(--header-muted); }
+.top .nav a { color: var(--header-ink); }
+.top .nav a[aria-current="page"], .top .nav a:hover { background: rgba(244,243,239,.14); }
+.top .icon-btn { background: transparent; color: var(--header-ink); border-color: rgba(244,243,239,.35); }
+.top::after { background: var(--kerb-stripe); }
+.action.primary { background: var(--primary-bg); color: var(--primary-ink); border-color: var(--primary-bg); }
+.action.primary .aicon { background: var(--primary-icon-bg); color: var(--primary-icon-ink); }
+/* END-OPTIONAL-COMPONENT-OVERRIDES */
