@@ -35,8 +35,9 @@ python3 query/build_deploy.py                    # writes deploy/app/ and checks
 
 ```bash
 kubectl -n "$NS" create configmap "${APP_NAME}-code" --from-file=deploy/app \
-  --dry-run=client -o yaml | kubectl apply -f -
+  --dry-run=client -o yaml | kubectl replace --force -f -
 ```
+`kubectl apply` stores a second copy of the bundle in an annotation, and that copy exceeds the 256 KB annotation limit. `replace --force` writes the ConfigMap once.
 
 ## 4. Secret (VSS login, VastDB, optional GPU token for Cosmos Embed1 search)
 
@@ -76,7 +77,7 @@ Then open https://workshop.thecosmoslabs.com and click **App**.
 
 ```bash
 python3 query/build_deploy.py
-kubectl -n "$NS" create configmap "${APP_NAME}-code" --from-file=deploy/app --dry-run=client -o yaml | kubectl apply -f -
+kubectl -n "$NS" create configmap "${APP_NAME}-code" --from-file=deploy/app --dry-run=client -o yaml | kubectl replace --force -f -
 kubectl -n "$NS" rollout restart deploy/"$APP_NAME"
 ```
 
