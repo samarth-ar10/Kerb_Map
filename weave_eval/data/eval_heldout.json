@@ -1,0 +1,161 @@
+{
+  "split": "held-out",
+  "note": "Batches other than A3/A6; not looked at while making the occupancy fix.",
+  "source": [
+    "answers_A1_Atharva.csv",
+    "answers_A2_build-b.csv",
+    "answers_A4_Atharva.csv"
+  ],
+  "files_skipped_dev_only": [
+    "answers_A3_builder_C.csv",
+    "answers_A6_builder_c.csv"
+  ],
+  "items_dropped_also_in_dev_batches": [
+    "nc1_20260902-0055",
+    "nc1_20260902-0117",
+    "nc1_20260902-0153",
+    "nc1_20260902-0302",
+    "nc1_20260902-0326",
+    "nc1_20260902-0333"
+  ],
+  "n_items_scored": 51,
+  "n_excluded": 1,
+  "excluded": [
+    {
+      "item_id": "nc1_20260902-0035",
+      "human_label": "cant_tell"
+    }
+  ],
+  "agree_before": 41,
+  "agree_after": 45,
+  "fixed_by_change": 4,
+  "broken_by_change": 0,
+  "state_changes": {
+    "not_space -> traffic": 1,
+    "traffic -> parked": 4
+  },
+  "confusion_before_rows_system_cols_human": {
+    "parked": {
+      "parked": 0,
+      "traffic": 0,
+      "not_space": 0
+    },
+    "traffic": {
+      "parked": 4,
+      "traffic": 6,
+      "not_space": 3
+    },
+    "not_space": {
+      "parked": 1,
+      "traffic": 2,
+      "not_space": 35
+    }
+  },
+  "confusion_after_rows_system_cols_human": {
+    "parked": {
+      "parked": 3,
+      "traffic": 0,
+      "not_space": 1
+    },
+    "traffic": {
+      "parked": 1,
+      "traffic": 7,
+      "not_space": 2
+    },
+    "not_space": {
+      "parked": 1,
+      "traffic": 1,
+      "not_space": 35
+    }
+  },
+  "human_label_counts": {
+    "parked": 5,
+    "not_space": 38,
+    "traffic": 8
+  },
+  "batches": [
+    "A1",
+    "A2",
+    "A4"
+  ],
+  "still_wrong_after": [
+    {
+      "item_id": "nc1_20260901-0001",
+      "batch": "A1",
+      "track_id": "20260901-0001",
+      "t_start": "0",
+      "t_end": "634.3",
+      "human_label": "parked",
+      "reason": null,
+      "before": "not_space",
+      "after": "not_space",
+      "after_area": "driveway",
+      "after_why": "mostly in driveway left"
+    },
+    {
+      "item_id": "nc1_20260901-0024",
+      "batch": "A4",
+      "track_id": "20260901-0024",
+      "t_start": "75.75",
+      "t_end": "75.8",
+      "human_label": "parked",
+      "reason": null,
+      "before": "traffic",
+      "after": "traffic",
+      "after_area": "lane",
+      "after_why": "mostly in lane, not on a parked period"
+    },
+    {
+      "item_id": "nc1_20260901-0154",
+      "batch": "A2",
+      "track_id": "20260901-0154",
+      "t_start": "841.05",
+      "t_end": "845.2",
+      "human_label": "not_space",
+      "reason": "driveway",
+      "before": "traffic",
+      "after": "traffic",
+      "after_area": "lane",
+      "after_why": "mostly in lane, not on a parked period"
+    },
+    {
+      "item_id": "nc1_20260902-0229",
+      "batch": "A1",
+      "track_id": "20260902-0229",
+      "t_start": "249.5",
+      "t_end": "250.05",
+      "human_label": "not_space",
+      "reason": "driveway",
+      "before": "traffic",
+      "after": "parked",
+      "after_area": "kerb",
+      "after_why": "most boxes on a parked period >= 120 s"
+    },
+    {
+      "item_id": "nc1_20260902-0233",
+      "batch": "A4",
+      "track_id": "20260902-0233",
+      "t_start": "254.65",
+      "t_end": "254.65",
+      "human_label": "not_space",
+      "reason": "not_a_vehicle",
+      "before": "traffic",
+      "after": "traffic",
+      "after_area": "kerb",
+      "after_why": "mostly in kerb, not on a parked period"
+    },
+    {
+      "item_id": "nc1_20260902-0318",
+      "batch": "A1",
+      "track_id": "20260902-0318",
+      "t_start": "372.35",
+      "t_end": "446.1",
+      "human_label": "traffic",
+      "reason": null,
+      "before": "not_space",
+      "after": "not_space",
+      "after_area": "driveway",
+      "after_why": "mostly in driveway right"
+    }
+  ]
+}

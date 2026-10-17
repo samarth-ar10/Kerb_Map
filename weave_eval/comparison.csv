@@ -1,0 +1,26 @@
+variant,group,n,exact,free_tp,free_system_said,free_human_said,occupied_tp,occupied_system_said,occupied_human_said,real_space_tp,real_space_system_said,real_space_human_said,free_precision,free_recall,occupied_precision,occupied_recall,real_space_precision,real_space_recall
+rules: shipped,all,53,17,5,6,14,7,11,13,12,17,27,0.833,0.357,0.636,0.538,0.706,0.444
+rules: shipped,tuning (set01-03),28,8,1,1,6,5,7,8,6,8,14,1.0,0.167,0.714,0.625,0.75,0.429
+rules: shipped,held-out (set04-06),25,9,4,5,8,2,4,5,6,9,13,0.8,0.5,0.5,0.4,0.667,0.462
+rules: shipped,labeller: Atharva,31,11,2,3,6,5,6,8,7,9,14,0.667,0.333,0.833,0.625,0.778,0.5
+rules: shipped,labeller: Builder C,28,8,3,3,10,2,5,5,5,8,15,1.0,0.3,0.4,0.4,0.625,0.333
+rules: +gap 0.85,all,53,20,8,9,14,7,11,13,15,20,27,0.889,0.571,0.636,0.538,0.75,0.556
+rules: +gap 0.85,tuning (set01-03),28,10,3,3,6,5,7,8,8,10,14,1.0,0.5,0.714,0.625,0.8,0.571
+rules: +gap 0.85,held-out (set04-06),25,10,5,6,8,2,4,5,7,10,13,0.833,0.625,0.5,0.4,0.7,0.538
+rules: +gap 0.85,labeller: Atharva,31,12,3,4,6,5,6,8,8,10,14,0.75,0.5,0.833,0.625,0.8,0.571
+rules: +gap 0.85,labeller: Builder C,28,10,5,5,10,2,5,5,7,10,15,1.0,0.5,0.4,0.4,0.7,0.467
+rules: +travel-lane row,all,53,23,5,6,14,7,8,13,12,14,27,0.833,0.357,0.875,0.538,0.857,0.444
+rules: +travel-lane row,tuning (set01-03),28,9,1,1,6,5,6,8,6,7,14,1.0,0.167,0.833,0.625,0.857,0.429
+rules: +travel-lane row,held-out (set04-06),25,14,4,5,8,2,2,5,6,7,13,0.8,0.5,1.0,0.4,0.857,0.462
+rules: +travel-lane row,labeller: Atharva,31,12,2,3,6,5,6,8,7,9,14,0.667,0.333,0.833,0.625,0.778,0.5
+rules: +travel-lane row,labeller: Builder C,28,14,3,3,10,2,2,5,5,5,15,1.0,0.3,1.0,0.4,1.0,0.333
+rules: +OSM no-parking travel lane,all,53,18,5,6,14,7,11,13,12,17,27,0.833,0.357,0.636,0.538,0.706,0.444
+rules: +OSM no-parking travel lane,tuning (set01-03),28,9,1,1,6,5,7,8,6,8,14,1.0,0.167,0.714,0.625,0.75,0.429
+rules: +OSM no-parking travel lane,held-out (set04-06),25,9,4,5,8,2,4,5,6,9,13,0.8,0.5,0.5,0.4,0.667,0.462
+rules: +OSM no-parking travel lane,labeller: Atharva,31,11,2,3,6,5,6,8,7,9,14,0.667,0.333,0.833,0.625,0.778,0.5
+rules: +OSM no-parking travel lane,labeller: Builder C,28,9,3,3,10,2,5,5,5,8,15,1.0,0.3,0.4,0.4,0.625,0.333
+rules: all three (chosen),all,53,27,8,9,14,7,8,13,15,17,27,0.889,0.571,0.875,0.538,0.882,0.556
+rules: all three (chosen),tuning (set01-03),28,12,3,3,6,5,6,8,8,9,14,1.0,0.5,0.833,0.625,0.889,0.571
+rules: all three (chosen),held-out (set04-06),25,15,5,6,8,2,2,5,7,8,13,0.833,0.625,1.0,0.4,0.875,0.538
+rules: all three (chosen),labeller: Atharva,31,13,3,4,6,5,6,8,8,10,14,0.75,0.5,0.833,0.625,0.8,0.571
+rules: all three (chosen),labeller: Builder C,28,17,5,5,10,2,2,5,7,7,15,1.0,0.5,1.0,0.4,1.0,0.467

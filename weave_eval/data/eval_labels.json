@@ -1,0 +1,141 @@
+{
+  "split": "dev",
+  "note": "Batches A3 and A6 were looked at while the polygons and occupancy rule were changed. This is a development score, not a held-out one. Batches A1, A2, A4, A5 returned later are the held-out check: run this script without --dev.",
+  "source": [
+    "merged_labels.csv"
+  ],
+  "n_items_scored": 40,
+  "n_excluded": 0,
+  "excluded": [],
+  "agree_before": 25,
+  "agree_after": 34,
+  "fixed_by_change": 10,
+  "broken_by_change": 1,
+  "state_changes": {
+    "traffic -> parked": 7,
+    "not_space -> traffic": 5
+  },
+  "confusion_before_rows_system_cols_human": {
+    "parked": {
+      "parked": 0,
+      "traffic": 0,
+      "not_space": 0
+    },
+    "traffic": {
+      "parked": 8,
+      "traffic": 2,
+      "not_space": 2
+    },
+    "not_space": {
+      "parked": 0,
+      "traffic": 5,
+      "not_space": 23
+    }
+  },
+  "confusion_after_rows_system_cols_human": {
+    "parked": {
+      "parked": 6,
+      "traffic": 0,
+      "not_space": 1
+    },
+    "traffic": {
+      "parked": 2,
+      "traffic": 6,
+      "not_space": 2
+    },
+    "not_space": {
+      "parked": 0,
+      "traffic": 1,
+      "not_space": 22
+    }
+  },
+  "human_label_counts": {
+    "not_space": 25,
+    "parked": 8,
+    "traffic": 7
+  },
+  "batches": [
+    "A3",
+    "A6"
+  ],
+  "still_wrong_after": [
+    {
+      "item_id": "nc1_20260901-0020",
+      "batch": "A3",
+      "track_id": "20260901-0020",
+      "t_start": "60",
+      "t_end": "61.95",
+      "human_label": "not_space",
+      "reason": "driveway",
+      "before": "traffic",
+      "after": "traffic",
+      "after_area": "kerb",
+      "after_why": "mostly in kerb, not on a parked period"
+    },
+    {
+      "item_id": "nc1_20260901-0093",
+      "batch": "A6",
+      "track_id": "20260901-0093",
+      "t_start": "515.35",
+      "t_end": "517.05",
+      "human_label": "parked",
+      "reason": null,
+      "before": "traffic",
+      "after": "traffic",
+      "after_area": "kerb",
+      "after_why": "mostly in kerb, not on a parked period"
+    },
+    {
+      "item_id": "nc1_20260902-0117",
+      "batch": "A3",
+      "track_id": "20260902-0117",
+      "t_start": "132.45",
+      "t_end": "143.45",
+      "human_label": "traffic",
+      "reason": null,
+      "before": "not_space",
+      "after": "not_space",
+      "after_area": "driveway",
+      "after_why": "mostly in driveway right"
+    },
+    {
+      "item_id": "nc1_20260902-0119",
+      "batch": "A6",
+      "track_id": "20260902-0119",
+      "t_start": "134.3",
+      "t_end": "135.95",
+      "human_label": "not_space",
+      "reason": "driveway",
+      "before": "traffic",
+      "after": "parked",
+      "after_area": "kerb",
+      "after_why": "most boxes on a parked period >= 120 s"
+    },
+    {
+      "item_id": "nc1_20260902-0316",
+      "batch": "A3",
+      "track_id": "20260902-0316",
+      "t_start": "370.05",
+      "t_end": "372.15",
+      "human_label": "not_space",
+      "reason": "driveway",
+      "before": "not_space",
+      "after": "traffic",
+      "after_area": "lane",
+      "after_why": "mostly in lane, not on a parked period"
+    },
+    {
+      "item_id": "nc1_20260902-0334",
+      "batch": "A3",
+      "track_id": "20260902-0334",
+      "t_start": "391.9",
+      "t_end": "392.95",
+      "human_label": "parked",
+      "reason": null,
+      "before": "traffic",
+      "after": "traffic",
+      "after_area": "lane",
+      "after_why": "mostly in lane, not on a parked period"
+    }
+  ]
+}
