@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kerb Map</title>
+<script>
+  // Served under /app with the prefix stripped: make sure the URL ends in "/" so relative URLs stay inside it.
+  if (!/\/$|\.html$/.test(location.pathname)) location.replace(location.pathname + "/" + location.search);
+</script>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="home">
+<main class="hero">
+  <div class="kerbline" aria-hidden="true"></div>
+  <h1 class="hname"><span class="pmark">P</span>Kerb Map</h1>
+  <p class="promise">Free kerb spaces near you, seen by dashcams and street cameras.</p>
+  <div class="actions">
+    <a class="action" href="setup.html" data-keep>
+      <span class="aicon" aria-hidden="true">
+        <svg viewBox="0 0 48 48" width="44" height="44"><rect x="6" y="12" width="36" height="24" rx="5" fill="none" stroke="currentColor" stroke-width="3.5"/><circle cx="24" cy="24" r="7" fill="none" stroke="currentColor" stroke-width="3.5"/><circle cx="36" cy="17" r="2" fill="currentColor"/></svg>
+      </span>
+      <span class="atext"><b>Set up my dashcam</b><span>Share your drives, help everyone park</span></span>
+    </a>
+    <a class="action primary" href="find.html" data-keep>
+      <span class="aicon" aria-hidden="true">
+        <svg viewBox="0 0 48 48" width="44" height="44"><path d="M24 4c-8 0-14 6-14 14 0 10 14 26 14 26s14-16 14-26c0-8-6-14-14-14z" fill="none" stroke="currentColor" stroke-width="3.5"/><text x="24" y="24" text-anchor="middle" font-size="15" font-weight="800" fill="currentColor" font-family="system-ui, sans-serif">P</text></svg>
+      </span>
+      <span class="atext"><b>Find parking</b><span>Nearest free spaces, with when they were seen</span></span>
+    </a>
+  </div>
+</main>
+<footer class="foot"><a href="board.html">Team tools</a><button class="icon-btn" id="theme" type="button" aria-label="Switch theme">Dark</button></footer>
+<script src="api.js"></script>
+<script>window.KerbUI.theme(); window.KerbUI.keepPreviewInLinks();</script>
+</body>
+</html>

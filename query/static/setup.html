@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kerb Map · Set up</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="simple">
+<header class="sbar">
+  <a class="sback" href="index.html" data-keep aria-label="Home">←</a>
+  <h1>Set up my dashcam</h1>
+  <button class="icon-btn" id="theme" type="button" aria-label="Switch theme">Dark</button>
+</header>
+<div id="banner" class="banner" role="status" hidden></div>
+<main class="narrow">
+  <ol class="steps">
+    <li class="step">
+      <span class="sn">1</span>
+      <div class="sbody">
+        <h2>Connect your dashcam or phone</h2>
+        <p>Pair a Wi-Fi dashcam, or use your phone as one.</p>
+        <button class="btn" type="button" disabled>Connect</button> <span class="soon">Coming soon</span>
+      </div>
+    </li>
+    <li class="step">
+      <span class="sn">2</span>
+      <div class="sbody">
+        <h2>Turn on auto-upload</h2>
+        <p>Each 30 s clip uploads within about a minute.</p>
+        <label class="toggle"><input type="checkbox" disabled><span></span>Auto-upload</label> <span class="soon">Coming soon</span>
+      </div>
+    </li>
+    <li class="step">
+      <span class="sn">3</span>
+      <div class="sbody">
+        <h2>Done</h2>
+        <p>Your drives show up below. The kerb they saw shows up on the map.</p>
+        <a class="btn" href="find.html" data-keep>Find parking</a>
+      </div>
+    </li>
+  </ol>
+
+  <section class="drives">
+    <h2>My drives</h2>
+    <p class="demo-note">Demo account: drives from the supplied footage</p>
+    <ul id="drives" class="dlist"><li class="muted">Loading…</li></ul>
+  </section>
+</main>
+<script src="api.js"></script>
+<script>
+(function () {
+  "use strict";
+  var A = window.KerbAPI, UI = window.KerbUI, esc = A.esc;
+  UI.theme();
+  function nice(id) {
+    var m = String(id).match(/^([\w-]+):(set\d+)$/);
+    if (m) return "Toronto drive " + m[2].replace("set", "#").replace("#0", "#");
+    return String(id).replace(/_/g, " ");
+  }
+  A.init().then(async function () {
+    var el = document.getElementById("drives");
+    var drives = [];
+    try { drives = await A.replayDrives([]); } catch (e) { drives = []; }
+    if (!drives.length) { el.innerHTML = '<li class="muted">No drives yet</li>'; return; }
+    var max = drives.reduce(function (m, d) { return Math.max(m, d.clips || 0); }, 0);
+    el.innerHTML = drives.map(function (d) {
+      var bits = [];
+      if (d.clips != null) bits.push(d.clips + " clips");
+      if (d.receipts != null) bits.push(d.receipts + " kerb spots");
+      var w = max && d.clips ? Math.max(6, d.clips / max * 100) : 0;
+      return '<li><span class="dicon" aria-hidden="true">▶</span><div class="dmain"><b>' + esc(nice(d.drive_id)) + "</b>" +
+        '<span class="dmeta">' + esc(bits.join(" · ") || d.drive_id) + "</span>" +
+        (w ? '<span class="dbar"><i style="width:' + w + '%"></i></span>' : "") + "</div></li>";
+    }).join("");
+  });
+})();
+</script>
+</body>
+</html>

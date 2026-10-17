@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kerb Map · Board</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="board">
+<header class="top">
+  <div class="brand"><h1><span>K</span>Label board</h1></div>
+  <nav class="nav" aria-label="Pages">
+    <a href="index.html" data-keep>Home</a>
+    <a href="label.html" data-keep>Label</a>
+    <a href="board.html" data-keep aria-current="page">Board</a>
+    <a href="measured.html" data-keep>Measured</a>
+    <button class="icon-btn" id="theme" type="button" aria-label="Switch theme">Dark</button>
+  </nav>
+</header>
+<div id="banner" class="banner" role="status" hidden></div>
+<main class="page">
+  <div class="tiles" id="tiles"></div>
+  <div class="boardgrid">
+    <section>
+      <h2>Progress</h2>
+      <div id="progress"></div>
+      <h2 style="margin-top:18px">Needs a third look</h2>
+      <div class="third"><b id="third">–</b><a class="btn" id="claim3" href="label.html?mode=third_look" data-keep>Claim</a></div>
+    </section>
+    <section>
+      <h2>Top disagreements</h2>
+      <div id="dis"></div>
+    </section>
+  </div>
+  <p class="stamp" id="stamp"></p>
+</main>
+<script src="api.js"></script>
+<script>
+(function () {
+  "use strict";
+  var A = window.KerbAPI, UI = window.KerbUI, esc = A.esc;
+  var $ = function (id) { return document.getElementById(id); };
+  UI.theme();
+  function pct(x) { return x == null ? "–" : Math.round(x * 100) + "%"; }
+  function bar(name, p) {
+    p = p || {};
+    var total = p.total || 0, done = p.done || 0;
+    return '<div class="pbar"><div class="row2"><span>' + esc(name) + "</span><span>" + (total ? done + " / " + total : "–") +
+      '</span></div><div class="bar"><i style="width:' + (total ? Math.min(100, done / total * 100) : 0) + '%"></i></div></div>';
+  }
+  async function tick() {
+    var d;
+    try { d = await A.board(); }
+    catch (e) { $("stamp").innerHTML = '<span class="err">Board unavailable: ' + esc(e.message) + "</span>"; return; }
+    var ls = d.labellers || [];
+    $("tiles").innerHTML = ls.length ? ls.map(function (l) {
+      var agr = l.agreement != null ? l.agreement : (l.compared ? l.agree / l.compared : null);
+      return '<div class="tile"><h3>' + esc(l.labeller) + (l.in_progress ? '<span class="live">' + l.in_progress + " open</span>" : "") + "</h3>" +
+        '<div class="nums"><div><b>' + (l.done || 0) + "</b><span>done</span></div>" +
+        "<div><b>" + (l.items_per_min != null ? l.items_per_min : "–") + "</b><span>per min</span></div>" +
+        "<div><b>" + pct(agr) + "</b><span>agree" + (l.compared ? " (" + l.compared + ")" : "") + "</span></div></div></div>";
+    }).join("") : '<div class="tile"><h3>No labels yet</h3></div>';
+    var pr = d.progress || {};
+    $("progress").innerHTML = bar("Dev", pr.dev) + bar("Held-out", pr.heldout);
+    $("third").textContent = d.needs_third_look != null ? d.needs_third_look : "–";
+    var dis = d.disagreements || [];
+    var max = dis.reduce(function (m, x) { return Math.max(m, x.count); }, 0);
+    $("dis").innerHTML = dis.length ? dis.slice(0, 5).map(function (x) {
+      return '<div class="hbar"><span>' + esc(String(x.reason).replace(/_/g, " ")) + '</span><span class="bar"><i style="width:' + (max ? x.count / max * 100 : 0) +
+        '%"></i></span><span class="c">' + x.count + "</span></div>";
+    }).join("") : '<p class="muted">None yet</p>';
+    $("stamp").textContent = "Updated " + new Date().toLocaleTimeString() + (d.preview ? " · preview: labels from this browser only" : "");
+  }
+  A.init().then(function () { tick(); setInterval(tick, 10000); });
+})();
+</script>
+</body>
+</html>

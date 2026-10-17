@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kerb Map · Explore</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="mapbody">
+<header class="top">
+  <div class="brand">
+    <h1><span>K</span>Kerb Map</h1>
+    <p>On-street parking, read from the cameras that already see the kerb.</p>
+  </div>
+  <span class="live-chip" id="live" title="Newest clip processed"><i></i><span id="liveText">…</span></span>
+  <nav class="nav" aria-label="Pages">
+    <a href="index.html" data-keep>Home</a>
+    <a href="label.html" data-keep>Label</a>
+    <a href="board.html" data-keep>Board</a>
+    <a href="measured.html" data-keep>Measured</a>
+    <button class="icon-btn" id="theme" type="button" aria-label="Switch theme">Dark</button>
+  </nav>
+</header>
+<div id="banner" class="banner" role="status" hidden></div>
+
+<main class="mapview">
+  <aside class="panel" aria-label="Search and receipts">
+    <section id="find">
+      <form id="destForm" class="search dest" role="search">
+        <input id="dest" type="search" autocomplete="off" placeholder="Where are you going?" aria-label="Destination">
+        <button class="btn" type="submit">Go</button>
+      </form>
+      <form id="searchForm" class="search" role="search">
+        <label for="q" class="sr" hidden>Search</label>
+        <input id="q" type="search" autocomplete="off" placeholder="free kerb space on the right near Augusta Ave">
+        <button class="btn" type="submit">Find</button>
+      </form>
+      <div class="filters">
+        <label>State
+          <select id="fState">
+            <option value="">Any</option><option value="free">Free</option><option value="occupied">Occupied</option>
+            <option value="not_space">Not a space</option><option value="cannot_tell">Cannot tell</option>
+          </select></label>
+        <label>Source
+          <select id="fSource">
+            <option value="">Both</option><option value="dashcam">Dashcam</option><option value="streetcam">Street camera</option>
+          </select></label>
+        <label>Radius
+          <select id="fRadius">
+            <option value="100">100 m</option><option value="200" selected>200 m</option><option value="500">500 m</option><option value="1000">1 km</option>
+          </select></label>
+      </div>
+      <div id="understood" class="understood"></div>
+      <p class="hint" id="hint">Click the map to drop a pin, or type a place.</p>
+      <div class="replay" id="replayBox">
+        <span class="rl">Replay a drive</span>
+        <select id="rDrive" aria-label="Drive"></select>
+        <span class="seg2" role="radiogroup" aria-label="Speed">
+          <label><input type="radio" name="rSpeed" value="1" checked><span>1×</span></label>
+          <label><input type="radio" name="rSpeed" value="4"><span>4×</span></label>
+        </span>
+        <button class="btn" id="rBtn" type="button">Start</button>
+      </div>
+    </section>
+
+    <section id="results">
+      <div id="counts" class="counts" aria-live="polite"></div>
+      <ul id="list" class="list"></ul>
+      <p class="notseen"><b>Not seen is not empty.</b> Kerb with no mark was not seen by any camera, so its state is unknown.</p>
+      <details class="how" id="how"><summary>How this was found</summary><pre class="mono" id="howText">No query yet.</pre></details>
+    </section>
+
+    <section id="receipt" hidden aria-live="polite"></section>
+  </aside>
+  <div class="mapwrap">
+    <div id="map" role="application" aria-label="Map of kerb receipts"></div>
+    <div class="replay-flag" id="replayFlag" hidden><b>Replayed from the supplied footage</b><span id="replayProg"></span></div>
+  </div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="api.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
