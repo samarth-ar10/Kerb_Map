@@ -19,6 +19,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from query import store
+from query.drivelog import summarize
 from query.sources import REPO
 from query.timeline import load_chunks
 
@@ -99,14 +100,40 @@ def list_drives():
     d = drives()
     spaces = store.read_all("kerb_spaces", None, limit=1000000)
     per_video = defaultdict(int)
+    streets = defaultdict(lambda: defaultdict(int))
+    newest = {}
     for s in spaces:
-        per_video[s.get("original_video")] += 1
+        vid = s.get("original_video")
+        per_video[vid] += 1
+        name = (s.get("street") or "").strip()
+        if name:
+            streets[vid][name] += 1
+        seen = s.get("last_seen") or ""
+        if seen > newest.get(vid, ""):
+            newest[vid] = seen
     out = []
     for k, v in sorted(d.items()):
         n = sum(per_video[x] for x in v)
-        out.append({"drive_id": k, "label": f"{k} ({n} receipts)", "clips": len(v), "receipts": n})
+        tally = defaultdict(int)
+        for x in v:
+            for name, c in streets[x].items():
+                tally[name] += c
+        street = max(tally, key=lambda name: (tally[name], name)) if tally else None
+        date = max((newest.get(x, "") for x in v), default="")[:10] or None
+        out.append({"drive_id": k, "label": f"{k} ({n} receipts)", "clips": len(v), "receipts": n,
+                    "street": street, "date": date})
     return {"mode": "replay", "note": NOTE, "timeline": os.path.basename(_timeline_path() or "") or None,
             "drives": out}
+
+
+@router.get("/api/drives/{drive_id:path}")
+def drive_log(drive_id: str):
+    """Streets and states this drive's existing receipts already recorded. No writes."""
+    d = drives()
+    if drive_id not in d:
+        raise HTTPException(404, f"unknown drive {drive_id!r}; see api/replay/drives")
+    spaces = store.read_all("kerb_spaces", None, limit=1000000)
+    return summarize(drive_id, d[drive_id], spaces)
 
 
 @router.post("/api/replay/start")

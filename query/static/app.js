@@ -332,7 +332,7 @@
 
     $("receipt").innerHTML = html;
     wireBack();
-    UI.media($("ev"), d.evidence_uri || s.evidence_uri, d.mark, start, end);
+    UI.media($("ev"), d.evidence_uri || s.evidence_uri, d.mark, start, end, { keyframe: UI.keyframe(d, s), word: UI.markWord(d, s) });
 
     $("ovr").addEventListener("submit", async function (e) {
       e.preventDefault();

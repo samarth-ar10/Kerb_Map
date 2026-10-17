@@ -25,7 +25,15 @@
   var spotLayer = L.layerGroup().addTo(map);
   var hereLayer = L.layerGroup().addTo(map);
   var markers = {};
-  var S = { centre: null, rows: [], selected: null, label: "" };
+  var QS = new URLSearchParams(location.search);
+  var S = { centre: null, rows: [], selected: null, label: "", job: QS.get("job_id") || "", jobOnly: !!QS.get("job_id") };
+  function paintJobChip() {
+    var c = $("jobChip");
+    c.hidden = !S.job;
+    c.classList.toggle("on", S.jobOnly);
+    c.setAttribute("aria-pressed", String(S.jobOnly));
+    c.textContent = S.jobOnly ? "This drive \u2713" : "All drives";
+  }
 
   // ------------------------------------------------------------ bottom sheet (mobile)
   var sheet = $("sheet");
@@ -92,7 +100,10 @@
     var n = Math.floor(len / CAR);
     return n >= 1 ? "Fits " + n + (n === 1 ? " car" : " cars") : "Short gap, " + (+len).toFixed(1) + " m";
   }
-  function seen(iso) { return "Seen " + UI.ago(iso); }
+  function seen(iso, src) {
+    var from = src === "streetcam" ? " from street camera" : src === "dashcam" ? " from dashcam video" : "";
+    return "Seen " + UI.ago(iso) + from;
+  }
   function ageMin(iso) { var t = Date.parse(iso); return isNaN(t) ? null : (Date.now() - t) / 60000; }
   function fade(iso) {
     var m = ageMin(iso);
@@ -144,9 +155,28 @@
     $("sheetH").textContent = "Looking for spaces…";
     $("plist").innerHTML = "";
     var d;
-    try { d = await A.spaces({ lat: lat, lon: lon, radius_m: RADIUS, limit: 500 }); }
+    var q = S.jobOnly ? { lat: lat, lon: lon, radius_m: 20000, job_id: S.job, limit: 2000 } : { lat: lat, lon: lon, radius_m: RADIUS, limit: 500 };
+    var free = [];
+    try {
+      d = await A.spaces(q);
+      // Nearest free spaces come from their own server-side query, widening until at least 3 are found,
+      // so the busy states never crowd them out of the row limit.
+      if (!S.jobOnly) {
+        var radii = [500, 1500, 3000];
+        for (var i = 0; i < radii.length; i++) {
+          var f = await A.spaces({ lat: lat, lon: lon, radius_m: radii[i], state: "free", limit: 200 });
+          free = f.spaces || [];
+          if (free.length >= 3) break;
+        }
+      }
+    }
     catch (e) { $("sheetH").textContent = "Could not load spaces"; $("plist").innerHTML = '<li class="err">' + esc(e.message) + "</li>"; return; }
-    S.rows = (d.spaces || []).filter(function (s) { return s.lat != null && s.lon != null; });
+    var have = {};
+    var all = (d.spaces || []).filter(function (s) { return s.state !== "free" || S.jobOnly; }).concat(free);
+    S.rows = all.filter(function (s) {
+      if (s.lat == null || s.lon == null || have[s.space_id]) return false;
+      have[s.space_id] = 1; return true;
+    });
     S.rows.forEach(function (s) { s._d = dist(lat, lon, s.lat, s.lon); });
     $("area").hidden = !S.label;
     $("area").textContent = S.label;
@@ -165,9 +195,10 @@
     });
     var free = S.rows.filter(function (s) { return s.state === "free"; }).sort(function (a, b) { return a._d - b._d; });
     var rest = rows.filter(function (s) { return s.state !== "free"; }).sort(function (a, b) { return a._d - b._d; });
+    var where = S.jobOnly ? " from this drive" : " nearby";
     $("sheetH").innerHTML = free.length
-      ? '<span class="nfree">' + free.length + "</span> free " + (free.length === 1 ? "space" : "spaces") + " nearby"
-      : "No free spaces seen nearby";
+      ? '<span class="nfree">' + free.length + "</span> free " + (free.length === 1 ? "space" : "spaces") + where
+      : "No free spaces seen" + where;
     var html = free.map(row).join("");
     if (rest.length) html += '<li class="sub">Also nearby</li>' + rest.slice(0, 12).map(row).join("");
     $("plist").innerHTML = html;
@@ -182,7 +213,7 @@
     return '<li><button type="button" class="prow' + (s.state === "free" ? "" : " dim") + '" data-id="' + esc(s.space_id) + '">' +
       '<span class="pg s-' + esc(s.state) + '">' + glyph(s.state) + "</span>" +
       '<span class="pmain"><b>' + esc(fmtDist(s._d)) + " · " + esc(s.street || "Street unknown") + "</b>" +
-      '<span class="pmeta">' + esc(label(s.state)) + " · " + esc(seen(s.last_seen).toLowerCase()) + (s.state === "free" ? " · " + esc(fits(s.length_m).toLowerCase()) : "") +
+      '<span class="pmeta">' + esc(label(s.state)) + " · " + esc(seen(s.last_seen, s.source).toLowerCase()) + (s.state === "free" ? " · " + esc(fits(s.length_m).toLowerCase()) : "") +
       (s.preview ? ' <span class="tag-preview">PREVIEW</span>' : "") + "</span></span>" +
       '<span class="chev" aria-hidden="true">›</span></button></li>';
   }
@@ -221,7 +252,7 @@
       '<button class="close" id="closeCard" type="button" aria-label="Back to the list">×</button></div>' +
       '<h2 class="cstreet">' + esc(s.street || "Street unknown") + (s.side === "L" ? " · left side" : s.side === "R" ? " · right side" : "") + "</h2>" +
       (s.preview ? '<p class="pvline"><span class="tag-preview">PREVIEW ENTRY · NOT A RESULT</span></p>' : "") +
-      '<div class="facts3"><div>' + esc(fits(s.length_m)) + "</div><div>" + esc(seen(s.last_seen)) + "</div>" +
+      '<div class="facts3"><div>' + esc(fits(s.length_m)) + "</div><div>" + esc(seen(s.last_seen, s.source)) + "</div>" +
       (s._d != null ? "<div>" + esc(fmtDist(s._d)) + " away</div>" : "") + "</div>" +
       (s.position_status === "uncertain" ? '<p class="muted">Position is approximate.</p>' : "") +
       '<div class="media" id="cardMedia"></div>' +
@@ -229,7 +260,12 @@
       (s.receipt_text ? "<p>" + esc(s.receipt_text) + "</p>" : "") +
       '<p class="muted">' + (conf != null ? "Confidence " + conf + "% · " : "") + esc(UI.sourceLabel(s.source)) + (s.last_seen ? " · " + esc(s.last_seen) : "") + "</p>" +
       (trail.length ? '<ol class="trail">' + trail.map(function (t, i) {
-        var det = A.parseDetail(t), keys = Object.keys(det).filter(function (k) { return k !== "frame_size"; }).slice(0, 3);
+        // Never show storage paths or ids to users.
+        var det = A.parseDetail(t), keys = Object.keys(det).filter(function (k) {
+          var v = det[k];
+          return k !== "frame_size" && !/(_uri|_url|_id|video|path|source|key)$/i.test(k) &&
+            !(typeof v === "string" && /^(s3|file|https?):\/\/|\//i.test(v));
+        }).slice(0, 3);
         return '<li class="' + (t.step === "overrule" ? "ovr" : "") + '"><span class="n">' + (t.step_no || i + 1) + '</span><div class="st">' + esc(STEP_NAMES[t.step] || t.step) + "</div>" +
           '<div class="kv">' + keys.map(function (k) { var v = det[k]; return esc(k.replace(/_/g, " ")) + ": <b>" + esc(Array.isArray(v) ? v.join(", ") : typeof v === "object" ? JSON.stringify(v) : v) + "</b>"; }).join(" · ") + "</div></li>";
       }).join("") + "</ol>" : (d ? '<p class="muted">No steps recorded.</p>' : '<p class="muted">Loading…</p>')) +
@@ -244,7 +280,8 @@
 
   function wireCard(s, d) {
     $("closeCard").addEventListener("click", closeCard);
-    UI.media($("cardMedia"), (d && d.evidence_uri) || s.evidence_uri, d && d.mark, d && d.evidence_start, d && d.evidence_end, { autoplay: true });
+    UI.media($("cardMedia"), (d && d.evidence_uri) || s.evidence_uri, d && d.mark, d && d.evidence_start, d && d.evidence_end,
+      { keyframe: UI.keyframe(d, s), word: UI.markWord(d, s) });
     $("fb").addEventListener("click", function (e) {
       var b = e.target.closest("button[data-v]");
       if (!b) return;
@@ -288,6 +325,7 @@
     if (!g) { $("area").hidden = false; $("area").textContent = "Couldn't find “" + place + "”"; return; }
     closeCard();
     setSnap("peek");
+    S.jobOnly = false; paintJobChip();
     load(g.lat, g.lon, "Near " + g.label.replace(/ \(from receipts\)$/, ""), 17.5);
   });
   $("nearMe").addEventListener("click", function () {
@@ -307,6 +345,10 @@
   $("filterBack").addEventListener("click", function () { openFilter(false); });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("filterSheet").hidden) openFilter(false); });
   ["showOcc", "showOther"].forEach(function (id) { $(id).addEventListener("change", draw); });
+  $("jobChip").addEventListener("click", function () {
+    S.jobOnly = !S.jobOnly; paintJobChip(); closeCard();
+    if (S.centre) load(S.centre[0], S.centre[1], S.jobOnly ? "" : S.label);
+  });
   map.on("click", function () {
     if (!$("cardView").hidden) closeCard();
     else if (!wide.matches && snapName !== "peek") setSnap("peek");
@@ -316,10 +358,11 @@
   setSnap("peek", true);
   A.init().then(async function () {
     setSnap("peek", true);
-    var qs = new URLSearchParams(location.search);
+    paintJobChip();
+    var qs = QS;
     if (qs.get("lat") && qs.get("lon")) { load(+qs.get("lat"), +qs.get("lon"), "", 17.5); return; }
     var all = [];
-    try { all = ((await A.spaces({ limit: 5000 })).spaces || []).filter(function (s) { return s.lat != null && s.lon != null; }); } catch (e) { all = []; }
+    try { all = ((await A.spaces(S.job ? { job_id: S.job, limit: 5000 } : { limit: 5000 })).spaces || []).filter(function (s) { return s.lat != null && s.lon != null; }); } catch (e) { all = []; }
     if (!all.length) { load(43.6532, -79.4017, "", 17); return; }
     var free = all.filter(function (s) { return s.state === "free"; });
     var pool = free.length ? free : all;
@@ -328,6 +371,6 @@
     map.invalidateSize();
     var pad = wide.matches ? { padding: [50, 50] } : { paddingTopLeft: [24, topH() + 16], paddingBottomRight: [24, snaps().peek + 16] };
     map.fitBounds(all.map(function (s) { return [s.lat, s.lon]; }), Object.assign({ maxZoom: 18 }, pad));
-    load(lat, lon, "Demo area" + (pool[0].street ? " · " + pool[0].street : ""));
+    load(lat, lon, S.job ? "" : "Demo area" + (pool[0].street ? " · " + pool[0].street : ""));
   });
 })();

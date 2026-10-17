@@ -20,15 +20,17 @@ from query import store
 from query.labels import router as labels_router
 from query.replay import filter_as_of, router as replay_router
 from query.sources import REPO, jsonl_dirs
+from query.upload import router as upload_router
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(HERE, "static") if os.path.isdir(os.path.join(HERE, "static")) else HERE
-PAGES = {"index.html", "setup.html", "find.html", "find.js", "explore.html", "label.html", "board.html", "measured.html",
+PAGES = {"index.html", "setup.html", "drive.html", "find.html", "find.js", "explore.html", "label.html", "board.html", "measured.html",
          "app.js", "api.js", "label.js", "style.css", "favicon.svg", "favicon.png"}
 
 app = FastAPI(title="Kerb Map API")
 app.include_router(labels_router)
 app.include_router(replay_router)
+app.include_router(upload_router)
 
 
 # ---------------------------------------------------------------- health
@@ -65,12 +67,21 @@ def _check_state(state):
 @app.get("/api/spaces")
 def spaces(lat: Optional[float] = None, lon: Optional[float] = None, radius_m: float = 200.0,
            state: Optional[str] = None, side: Optional[str] = None, source: Optional[str] = None,
-           limit: int = Query(500, le=5000), as_of: Optional[float] = None):
-    """as_of (replay seconds): only receipts whose chunk has arrived in the running replay."""
+           limit: int = Query(500, le=5000), as_of: Optional[float] = None, job_id: Optional[str] = None):
+    """as_of (replay seconds): only receipts whose chunk has arrived in the running replay.
+    job_id: only the receipts written by that upload job (space_id up_<job_id>_...)."""
     _check_state(state)
-    rows = store.query_spaces(lat, lon, radius_m, state, side, source, 5000 if as_of is not None else limit)
+    wide = as_of is not None or bool(job_id)
+    if job_id and (lat is None or lon is None):
+        from query.upload import CAMERA_ID
+        eq = {k: v for k, v in (("camera_id", CAMERA_ID), ("state", state), ("side", side), ("source", source)) if v}
+        rows = store.read_all("kerb_spaces", eq, limit=100000)
+    else:
+        rows = store.query_spaces(lat, lon, radius_m, state, side, source, 5000 if wide else limit)
+    if job_id:
+        rows = [r for r in rows if store.job_of(r) == job_id][:limit]
     out = {"query": {"lat": lat, "lon": lon, "radius_m": radius_m, "state": state, "side": side,
-                     "source": source, "as_of": as_of}}
+                     "source": source, "as_of": as_of, "job_id": job_id}}
     if as_of is not None:
         rows = filter_as_of(rows, as_of)[:limit]
         out["mode"] = "replay"
@@ -200,6 +211,21 @@ def _allowed_dirs():
     if extra:
         dirs += [d for d in extra.split(os.pathsep) if d]
     return [os.path.realpath(d) for d in dirs]
+
+
+@app.get("/api/evidence/detections")
+def evidence_detections(source: str):
+    """Stored per-frame vehicle boxes for one segment (car/truck/bus), so the clip overlay can follow the scene."""
+    from fastapi.responses import JSONResponse
+    from query import evidence as ev
+    if not source.startswith("s3://"):
+        return JSONResponse({"error": "source must be an s3:// segment"}, status_code=404)
+    try:
+        return ev.detections_for(source)
+    except LookupError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=404)
+    except Exception as exc:
+        return JSONResponse({"error": f"could not read detections ({exc})"}, status_code=502)
 
 
 @app.get("/api/evidence")

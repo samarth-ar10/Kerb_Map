@@ -38,6 +38,9 @@ page with a banner.
 | `GET api/board`, `GET api/labels/summary`, `GET api/labels/export?split=&format=` | progress, human vs pipeline (dev), frozen export |
 | `GET api/measured` | results JSON from the measurement run (`results/measured.json` or `KERB_MEASURED`); 404 = not measured yet |
 | `GET api/replay/drives`, `POST api/replay/start`, `GET api/replay/status`, `POST api/replay/stop` | replay existing receipts clip by clip |
+| `POST api/upload` (multipart `file`, `gps`, `sample_id`), `GET api/upload/{job_id}` | upload a dashcam clip to VAST, wait for indexing, run the kerb pipeline (`kerbpipe.py`), save receipts `up_<job_id>_...`; see `DEMO_UPLOAD.md` |
+| `GET api/samples` (= `api/upload/samples`), `GET api/upload/latest-done` | prepared demo clips with known GPS (`samples_gps.json`, from `make_samples_gps.py`); the fallback job |
+| `GET api/spaces?job_id=` | only the receipts of one upload job (receipts carry `job_id`) |
 
 MCP (stdio): `python -m query.mcp_server` with `find_free_space`, `get_receipt`, `overrule`. Tasks: `agent_eval.md`.
 Real VastDB/embedding check: `SMOKE_TEST.md`. Deployment: `DEPLOY.md`.

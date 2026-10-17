@@ -104,7 +104,7 @@ def test_pages(client):
     c, _ = client
     assert "Kerb Map" in c.get("/").text
     assert "label.js" in c.get("/label").text
-    assert "Find parking" in c.get("/").text and "Set up my dashcam" in c.get("/").text
+    assert "Find parking" in c.get("/").text and "Connect your dashcam" in c.get("/").text and "NVIDIA Cosmos" in c.get("/").text
     home = c.get("/").text
     assert "favicon.svg" in home and "favicon.png" in home
     for f in ("app.js", "api.js", "label.js", "find.js", "style.css", "board.html", "measured.html", "index.html",
@@ -147,3 +147,32 @@ def test_feedback(client):
     assert c.post("/api/feedback", json={"space_id": "TEST_001", "vote": "down", "reason": "nope"}).status_code == 400
     assert c.post("/api/feedback", json={"space_id": "TEST_001", "vote": "up", "reason": "taken"}).status_code == 400
     assert c.post("/api/feedback", json={"space_id": "nope", "vote": "up"}).status_code == 404
+
+
+def test_evidence_detections(client, monkeypatch):
+    c, _ = client
+    from query import evidence as ev
+    ev._det_cache.clear()
+    calls = []
+    body = {"fps": 30.0, "frames": [
+        {"frame_index": 0, "time_sec": 0.0, "shape": [720, 1280], "detections": [
+            {"label": "car", "confidence": 0.91, "bbox": [10, 20, 110, 90]},
+            {"label": "person", "confidence": 0.8, "bbox": [1, 2, 3, 4]}]},
+        {"frame_index": 1, "time_sec": 1 / 30, "shape": [720, 1280], "detections": [
+            {"label": "truck", "confidence": 0.5, "bbox": [200, 20, 400, 200]}]}]}
+
+    def fake(path, params):
+        calls.append(params["source"])
+        if params["source"].endswith("missing.mp4"):
+            raise RuntimeError("down")
+        return body
+    monkeypatch.setattr(ev, "_vss_json", fake)
+    src = "s3://b/x_segment_4.mp4"
+    d = c.get("/api/evidence/detections", params={"source": src}).json()
+    assert d["fps"] == 30.0 and d["width"] == 1280 and d["height"] == 720
+    assert d["frames"]["0"] == [[10, 20, 110, 90, "car", 0.91]]
+    assert d["frames"]["1"][0][4] == "truck"
+    c.get("/api/evidence/detections", params={"source": src})
+    assert calls == [src]  # cached
+    assert c.get("/api/evidence/detections", params={"source": "s3://b/missing.mp4"}).status_code == 502
+    assert c.get("/api/evidence/detections", params={"source": "/etc/passwd"}).status_code == 404

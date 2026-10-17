@@ -45,6 +45,10 @@ spec:
           valueFrom: {secretKeyRef: {name: kerbmap-app-vss-creds, key: VASTDB_BUCKET}}
         - name: GPU_BEARER_TOKEN
           valueFrom: {secretKeyRef: {name: kerbmap-app-vss-creds, key: GPU_BEARER_TOKEN, optional: true}}
+        - name: COSMOS3_REASON_URL
+          valueFrom: {secretKeyRef: {name: kerbmap-app-vss-creds, key: COSMOS3_REASON_URL, optional: true}}
+        - name: KERB_DEMO_JOB
+          valueFrom: {secretKeyRef: {name: kerbmap-app-vss-creds, key: KERB_DEMO_JOB, optional: true}}
         volumeMounts:
         - name: code
           mountPath: /code

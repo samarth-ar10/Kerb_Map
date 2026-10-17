@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kerb Map · Drive log</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.png" type="image/png" sizes="32x32">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="simple">
+<header class="sbar">
+  <a class="sback" href="setup.html" data-keep aria-label="Your drives">←</a>
+  <h1 id="title">Drive log</h1>
+  <button class="icon-btn" id="theme" type="button" aria-label="Switch theme">Dark</button>
+</header>
+<div id="banner" class="banner" role="status" hidden></div>
+<main class="narrow">
+  <p class="demo-note" id="note">Loading…</p>
+  <p id="totals"></p>
+  <p id="maplink"></p>
+  <form id="findStreet" class="fsearch drive-search" role="search">
+    <input id="q" type="search" placeholder="Search streets on this drive" aria-label="Search streets on this drive">
+  </form>
+  <ul id="streets" class="dlist"><li class="muted">Loading…</li></ul>
+</main>
+<script src="api.js"></script>
+<script>
+(function () {
+  "use strict";
+  var A = window.KerbAPI, UI = window.KerbUI, esc = A.esc;
+  UI.theme();
+  var id = new URLSearchParams(location.search).get("id") || "";
+  var streets = [];
+  function nice(drive) {
+    var m = String(drive).match(/^([\w-]+):(set\d+)$/);
+    if (m) return "Toronto drive " + m[2].replace("set", "#").replace("#0", "#");
+    return String(drive).replace(/_/g, " ");
+  }
+  function line(n, word) { return n + " " + word; }
+  function render(q) {
+    var el = document.getElementById("streets");
+    var words = String(q || "").toLowerCase().trim();
+    var shown = streets.filter(function (s) { return !words || s.street.toLowerCase().indexOf(words) >= 0; });
+    if (!shown.length) { el.innerHTML = '<li class="muted">No street matches</li>'; return; }
+    el.innerHTML = shown.map(function (s) {
+      var bits = [line(s.free, "free"), line(s.occupied, "occupied"), line(s.cannot_tell, "cannot tell"), line(s.not_space, "not a space")];
+      return '<li><div class="dmain"><b>' + esc(s.street) + "</b>" +
+        '<span class="dmeta">' + esc(s.receipts + " receipts · " + bits.join(" · ")) + "</span></div></li>";
+    }).join("");
+  }
+  document.getElementById("findStreet").addEventListener("submit", function (e) { e.preventDefault(); });
+  document.getElementById("q").addEventListener("input", function () { render(this.value); });
+  A.init().then(function () {
+    if (!id) {
+      document.getElementById("note").textContent = "No drive was chosen.";
+      document.getElementById("streets").innerHTML = "";
+      return;
+    }
+    return fetch("api/drives/" + encodeURIComponent(id)).then(function (res) {
+      if (!res.ok) throw new Error("missing");
+      return res.json();
+    }).then(function (log) {
+      document.getElementById("title").textContent = nice(log.drive_id);
+      document.getElementById("note").textContent = log.note;
+      var c = log.counts || {};
+      var bits = [
+        log.receipts + " receipts",
+        log.clips + " clips",
+        (c.free || 0) + " free",
+        (c.occupied || 0) + " occupied",
+        (c.cannot_tell || 0) + " cannot tell",
+        (c.not_space || 0) + " not a space"
+      ];
+      if (log.position_uncertain) bits.push(log.position_uncertain + " position uncertain");
+      if (log.test_rows) bits.push(log.test_rows + " marked TEST");
+      if (log.last_seen) bits.push("last seen " + log.last_seen);
+      document.getElementById("totals").textContent = bits.join(" · ");
+      var map = document.getElementById("maplink");
+      if (log.lat != null && log.lon != null) {
+        map.innerHTML = '<a class="btn" data-keep href="find.html?lat=' + encodeURIComponent(log.lat) +
+          "&lon=" + encodeURIComponent(log.lon) + '">Show these pins on the map</a>';
+        UI.keepPreviewInLinks();
+      } else {
+        map.textContent = "No pin on this drive, so it is not on the map.";
+      }
+      streets = log.streets || [];
+      render("");
+    }).catch(function () {
+      document.getElementById("note").textContent = "This drive is not in the VAST library.";
+      document.getElementById("streets").innerHTML = "";
+    });
+  });
+})();
+</script>
+</body>
+</html>

@@ -124,3 +124,85 @@ def open_s3(uri, range_header=None):
     except Exception as exc:
         errors.append(f"s3: {type(exc).__name__}")
     raise RuntimeError("; ".join(errors))
+
+
+# ---------------------------------------------------------------- stored per-frame boxes (for tracking overlays)
+
+_VEHICLES = ("car", "truck", "bus")
+_det_cache = {}
+
+
+def _vss_json(path, params):
+    url = vss_settings()[0]
+    if not url:
+        raise RuntimeError("VSS settings missing")
+    full = url + path + "?" + urllib.parse.urlencode(params)
+    for attempt in (0, 1):
+        token = _vss_token(force=attempt == 1)
+        req = urllib.request.Request(full, headers={"Authorization": f"Bearer {token}"})
+        try:
+            with urllib.request.urlopen(req, timeout=60, context=_CTX) as resp:
+                return json.load(resp)
+        except urllib.error.HTTPError as exc:
+            if exc.code != 401 or attempt == 1:
+                raise
+    raise RuntimeError("unreachable")
+
+
+def compact_detections(body):
+    """VSS detections body -> {fps, width, height, frame_shape, frames: {idx: [[x1,y1,x2,y2,cls,conf], ...]}}."""
+    frames_in = (body or {}).get("frames") or []
+    fps = float(body.get("fps") or 30.0)
+    shape = None
+    out = {}
+    for i, fr in enumerate(frames_in):
+        if shape is None and fr.get("shape"):
+            shape = fr["shape"]
+        idx = fr.get("frame_index")
+        if idx is None:
+            idx = round(float(fr["time_sec"]) * fps) if fr.get("time_sec") is not None else i
+        boxes = []
+        for b in fr.get("detections") or []:
+            if b.get("label") in _VEHICLES and b.get("bbox") and len(b["bbox"]) == 4:
+                boxes.append([round(float(v), 1) for v in b["bbox"]] + [b["label"], round(float(b.get("confidence") or 0), 3)])
+        out[str(int(idx))] = boxes
+    shape = shape or body.get("video_shape") or body.get("frame_shape") or [1080, 1920]
+    h, w = int(shape[0]), int(shape[1])
+    return {"fps": fps, "width": w, "height": h, "frame_shape": [h, w], "frames": out}
+
+
+def _local_detections(source):
+    """Saved copy of the same VSS body (dashcam/fetch_detections_vm.py), keyed by the segment file stem."""
+    stem = source.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+    dirs = [d for d in (os.environ.get("KERB_DETECTIONS_DIR") or "").split(os.pathsep) if d]
+    dirs.append(os.path.expanduser("~/kerb-data/dashcam-det"))
+    for d in dirs:
+        path = os.path.join(d, stem + ".json")
+        if stem and os.path.isfile(path):
+            try:
+                with open(path, encoding="utf-8") as fh:
+                    return json.load(fh)
+            except (OSError, ValueError):
+                return None
+    return None
+
+
+def detections_for(source):
+    """Cached compact detections for one segment source. Raises LookupError (none stored) or RuntimeError."""
+    if source in _det_cache:
+        return _det_cache[source]
+    body = _local_detections(source)
+    try:
+        body = body or _vss_json("/api/v1/videos/detections", {"source": source})
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            raise LookupError("no detections stored for this source") from None
+        raise RuntimeError(f"VSS answered HTTP {exc.code}") from None
+    except Exception as exc:
+        raise RuntimeError(type(exc).__name__) from None
+    if not (body or {}).get("frames"):
+        raise LookupError("no detections stored for this source")
+    data = compact_detections(body)
+    with _lock:
+        _det_cache[source] = data
+    return data
