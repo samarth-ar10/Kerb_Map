@@ -7,6 +7,22 @@ trail, and a confidence. "Cannot tell" and "not seen" are honest answers, never 
 **Order of work today:** first the dashcam pipeline on the Toronto PIE drives (phase 1). Then street cameras (phase 2).
 Then the postcode/pin query that merges both (phase 3).
 
+## 0. The service
+
+**Your dashcam backs itself up to the cloud as you drive, and in return you get a live map of free kerb space where
+you're going.**
+
+1. **Sync, near-live:** the dashcam or phone uploads each 30 s clip to VAST storage as it is recorded (within about a
+   minute, not daily or weekly). Users keep a searchable log of their own drives.
+2. **Process in the cloud:** each new clip triggers the pipeline (stored boxes, kerb geometry, Cosmos only on unclear
+   gaps); receipts land in VastDB. Nothing heavy runs on the device.
+3. **Use:** find kerb space around you or around a destination; every answer shows when it was last seen.
+4. **Freshness grows with users:** more synced cars = fresher map; fixed street cameras keep busy kerbs live.
+
+**Demo:** a "live replay" mode feeds one supplied Toronto drive into the app clip by clip, in real time, and the map
+fills in as each clip arrives. It is labelled on screen as replayed from the supplied footage (organiser rule: no
+outside video).
+
 ## 1. Approach and targets
 
 The Toronto PIE dashcam drives in the library (public dataset, 6 drives) are the first source, with YOLO boxes, kerb
