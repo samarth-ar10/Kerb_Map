@@ -1,0 +1,14 @@
+{
+  "camera_id": "nyc_streets_cam-1",
+  "frame": "streetcam/frame_nyc.jpg",
+  "measured_curb": "On frame_nyc.jpg the west sidewalk meets the asphalt at y=663 to y=668 for x=70 to x=210.",
+  "kept": "geo_nyc.json",
+  "reason": "Every alternate pixel set increased the held-out error. The original fit stays.",
+  "trials": [
+    {"id": "original", "check_m": 3.33, "points": {"sw": [220, 760], "se": [1500, 820], "nw": [350, 560], "ne": [1480, 640], "check": [700, 800]}},
+    {"id": "sw_on_measured_curb", "check_m": 4.45, "points": {"sw": [210, 668], "se": [1500, 820], "nw": [350, 560], "ne": [1480, 640], "check": [700, 800]}},
+    {"id": "A", "check_m": 6.09, "points": {"sw": [210, 668], "se": [1680, 900], "nw": [300, 620], "ne": [1580, 740], "check": [930, 850]}},
+    {"id": "B", "check_m": 5.86, "points": {"sw": [210, 668], "se": [1750, 960], "nw": [280, 640], "ne": [1560, 760], "check": [930, 850]}},
+    {"id": "C", "check_m": 2.95, "points": {"sw": [160, 665], "se": [1620, 880], "nw": [360, 560], "ne": [1640, 700], "check": [900, 820]}}
+  ]
+}
