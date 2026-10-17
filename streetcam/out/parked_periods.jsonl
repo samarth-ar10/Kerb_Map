@@ -1,0 +1,2 @@
+{"day": "20260901", "kerb_id": "far", "t_start_s": 58.0, "t_end_s": 238.0, "from_m": 0.0, "to_m": 2.019, "n_cells": 2, "period_id": "20260901-P01", "duration_s": 180.0, "long_enough": true}
+{"day": "20260902", "kerb_id": "far", "t_start_s": 0.0, "t_end_s": 633.0, "from_m": 0.0, "to_m": 6.058, "n_cells": 6, "period_id": "20260902-P01", "duration_s": 633.0, "long_enough": true}
