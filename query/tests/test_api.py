@@ -105,8 +105,10 @@ def test_pages(client):
     assert "Kerb Map" in c.get("/").text
     assert "label.js" in c.get("/label").text
     assert "Find parking" in c.get("/").text and "Set up my dashcam" in c.get("/").text
+    home = c.get("/").text
+    assert "favicon.svg" in home and "favicon.png" in home
     for f in ("app.js", "api.js", "label.js", "find.js", "style.css", "board.html", "measured.html", "index.html",
-              "setup.html", "find.html", "explore.html"):
+              "setup.html", "find.html", "explore.html", "favicon.svg", "favicon.png"):
         assert c.get("/" + f).status_code == 200, f
     assert c.get("/preview-data.json").status_code == 404
     assert c.get("/api/measured").status_code == 404

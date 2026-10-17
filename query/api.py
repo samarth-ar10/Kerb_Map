@@ -25,7 +25,7 @@ from query.upload import router as upload_router
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(HERE, "static") if os.path.isdir(os.path.join(HERE, "static")) else HERE
 PAGES = {"index.html", "setup.html", "drive.html", "find.html", "find.js", "explore.html", "label.html", "board.html", "measured.html",
-         "app.js", "api.js", "label.js", "style.css"}
+         "app.js", "api.js", "label.js", "style.css", "favicon.svg", "favicon.png"}
 
 app = FastAPI(title="Kerb Map API")
 app.include_router(labels_router)

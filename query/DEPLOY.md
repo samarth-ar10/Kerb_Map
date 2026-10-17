@@ -4,8 +4,8 @@ Pattern from the starter kit's `deployment/deploy-app-no-registry` skill: public
 ConfigMap, credentials from a Secret, Ingress on the team host at `/app` (prefix stripped). Users open
 https://workshop.thecosmoslabs.com and click **App**.
 
-These commands are for a person to run on the lab VM, from the repo root, after the team agrees to deploy.
-Nothing here has been applied to the cluster yet.
+These commands are for a person to run on the lab VM, from the repo root.
+`kerbmap-app` is already on the cluster. A code change uses the update steps at the bottom.
 
 ## 0. Rehearse first (touches nothing shared)
 
