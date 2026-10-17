@@ -8,32 +8,11 @@ The product sketch is [ONE-PAGER.md](ONE-PAGER.md). The build plan is [PLAN.md](
 
 Both pipelines read boxes that VSS already stored (YOLO11, confidence at least 0.4, no track ids). They do not re-run YOLO. They write the same tables through `common/kerbdb.py`. The app reads those tables, and falls back to the JSONL files the builders committed under `dashcam/out/` and `streetcam/out/`.
 
-```
-VSS explore / detections / stream
-        |  stored boxes, frames
-        v
-dashcam/                          streetcam/
-  keyframe ~every 8 m               track boxes across a day
-  kerb rows and gaps                kerb strip drawn once per camera
-  OpenStreetMap rules               parked = still on that strip
-  Cosmos only on open gaps          homography to lat/lon when a check passes
-  GPS pin from PIE                  else position uncertain
-        \                          /
-         v                        v
-              common/kerbdb.py
-         VastDB schema kerbmap, or local SQLite
-         plus JSONL copies in each out/
-                    |
-                    v
-                 query/
-         map, receipt, search, labels, replay, MCP
-                    |
-                    v
-         deploy/k8s/kerbmap-app.yaml
-         (manifest only; not applied to the cluster)
-```
+![How a receipt is made. The library feeds a dashcam lane and a street-camera lane. Both write the same six tables, and a pin query reads them.](design/how-a-receipt-is-made.png)
 
-A free space, in the model, is a legal stretch a camera actually saw, empty for about one car length (5.5 m). A newer sighting of the same metres wins. Street cameras keep one stretch fresh. Dashcams cover other roads, then go stale.
+![What a receipt holds. A state, a side, a length, a position, when it was last seen, an evidence frame, and the decision trail. Free means legal, seen, and empty for about one car.](design/what-a-receipt-holds.png)
+
+A free space is a legal stretch a camera actually saw, empty for about one car length (5.5 m). A newer sighting of the same metres wins. Street cameras keep one stretch fresh. Dashcams cover other roads, then go stale. `position_status` is `ok` only when the check is under 2 m.
 
 ### Dashcam (`pie_cam-3`, Toronto PIE)
 
