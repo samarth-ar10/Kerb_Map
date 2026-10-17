@@ -1,7 +1,13 @@
-"""Second agent: a local LLM (Ollama) that answers kerb questions with the Kerb Map tools.
+"""Second agent: an LLM that answers kerb questions with the Kerb Map tools.
 
-    python -m query.agent_run --base http://localhost:18001 --model gemma4:e4b
-    python -m query.agent_run --base https://<deployed-app> --tasks 1,2,3,4      # read-only tasks
+    python -m query.agent_run --base http://localhost:18001 --model gemma4:e4b            # local Ollama
+    python -m query.agent_run --base https://<deployed-app> --tasks 1,2,3,4               # read-only tasks
+    python -m query.agent_run --llm wandb --model <id> --base http://localhost:8001       # W&B Inference
+    python -m query.agent_run --dry-run-tools --base http://localhost:8001                # tool layer only, no LLM
+
+--llm wandb uses W&B Serverless Inference (OpenAI-compatible, https://api.inference.wandb.ai/v1) with
+WANDB_API_KEY, WANDB_TEAM and WANDB_PROJECT from the environment. It uses native tool calling and falls
+back to a JSON-action loop if the model rejects the `tools` parameter.
 
 The tools (find_free_space, get_receipt, overrule, plus count_spaces) are the MCP tools of
 query/mcp_server.py, re-implemented over the HTTP API so the agent works against any running app.
@@ -12,6 +18,7 @@ the run is written to query/out/agent_run.md.
 
 import argparse
 import json
+import os
 import re
 import time
 from collections import Counter
@@ -21,6 +28,14 @@ import requests
 
 OUT = Path(__file__).parent / "out" / "agent_run.md"
 TIMEOUT = 120
+WANDB_BASE_URL = "https://api.inference.wandb.ai/v1"
+WANDB_DEFAULT_MODEL = "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B"
+WANDB_FALLBACK_MODEL = "meta-llama/Llama-3.3-70B-Instruct"  # used if the chosen model rejects `tools`
+
+
+def _env(name):
+    """Env value with surrounding whitespace and quotes removed (/etc/environment often quotes values)."""
+    return os.environ.get(name, "").strip().strip('"').strip("'").strip()
 
 
 class Api:
@@ -41,8 +56,9 @@ class Api:
 # ---------------------------------------------------------------- tools (HTTP versions of the MCP tools)
 
 class Tools:
-    def __init__(self, api):
+    def __init__(self, api, by="agent"):
         self.api = api
+        self.by = by
         self.allow_write = False
         self.writes = 0
 
@@ -110,7 +126,7 @@ class Tools:
             return {"error": "only one overrule allowed per run"}
         self.writes += 1
         try:
-            d = self.api.post("/api/overrule", {"space_id": space_id, "new_state": state, "note": note, "by": "agent"})
+            d = self.api.post("/api/overrule", {"space_id": space_id, "new_state": state, "note": note, "by": self.by})
         except requests.HTTPError as exc:
             return {"error": str(exc), "space_id": space_id}
         return {k: d.get(k) for k in ("overrule_id", "space_id", "before", "after")}
@@ -161,16 +177,113 @@ SYSTEM = (
 
 # ---------------------------------------------------------------- agent loop
 
-def chat(ollama, model, messages, tools):
-    body = {"model": model, "messages": messages, "tools": tools, "stream": False, "think": False,
-            "options": {"temperature": 0}}
-    for attempt in range(3):
-        r = requests.post(f"{ollama}/api/chat", json=body, timeout=600)
-        if r.ok:
-            return r.json()["message"]
-        print(f"ollama {r.status_code}: {r.text[:200]} (retry {attempt + 1})")
-        time.sleep(3)
-    r.raise_for_status()
+class OllamaLLM:
+    """Ollama /api/chat with native tool calling."""
+    label = "Ollama (tool calling through /api/chat `tools`)"
+
+    def __init__(self, url, model):
+        self.url, self.model = url, model
+
+    def chat(self, messages, tools):
+        body = {"model": self.model, "messages": messages, "tools": tools, "stream": False, "think": False,
+                "options": {"temperature": 0}}
+        for attempt in range(3):
+            r = requests.post(f"{self.url}/api/chat", json=body, timeout=600)
+            if r.ok:
+                return r.json()["message"]
+            print(f"ollama {r.status_code}: {r.text[:200]} (retry {attempt + 1})")
+            time.sleep(3)
+        r.raise_for_status()
+
+    def tool_result(self, call_id, name, content):
+        return {"role": "tool", "content": content, "tool_name": name}
+
+
+class WandbLLM:
+    """W&B Serverless Inference through the OpenAI-compatible endpoint.
+
+    Native tool calling first; if the model rejects `tools`, switch to a JSON-action loop where the
+    tool specs go in the system prompt and the model replies with {"name": ..., "arguments": {...}}."""
+
+    def __init__(self, model):
+        import openai
+        self.client = openai.OpenAI(base_url=WANDB_BASE_URL, api_key=_env("WANDB_API_KEY"),
+                                    project=f"{_env('WANDB_TEAM')}/{_env('WANDB_PROJECT')}")
+        self.model = model
+        self.native = True
+        self.switched_from = None
+
+    @property
+    def label(self):
+        mode = "native tool calling" if self.native else "JSON-action loop (model did not accept `tools`)"
+        sw = f"; switched from {self.switched_from}, which rejected `tools`" if self.switched_from else ""
+        return f"W&B Inference ({mode}{sw})"
+
+    def _create(self, messages, tools=None):
+        kw = {"model": self.model, "messages": messages, "temperature": 0, "max_tokens": 800}
+        if tools:
+            kw["tools"] = tools
+        for attempt in range(3):
+            try:
+                return self.client.chat.completions.create(**kw)
+            except Exception as exc:  # rate limit / transient; tool rejection is handled by the caller
+                if getattr(exc, "status_code", None) in (400, 401, 403, 404, 422):
+                    raise
+                print(f"W&B Inference error {type(exc).__name__} (retry {attempt + 1})")
+                time.sleep(3 * (attempt + 1))
+        return self.client.chat.completions.create(**kw)
+
+    def chat(self, messages, tools):
+        if self.native:
+            try:
+                m = self._create(messages, tools).choices[0].message
+                tcs = [{"id": tc.id, "type": "function",
+                        "function": {"name": tc.function.name, "arguments": tc.function.arguments or "{}"}}
+                       for tc in (m.tool_calls or [])]
+                return {"role": "assistant", "content": m.content or "", "tool_calls": tcs}
+            except Exception as exc:
+                if getattr(exc, "status_code", None) not in (400, 404, 422):
+                    raise
+                if self.model != WANDB_FALLBACK_MODEL and self.switched_from is None:
+                    print(f"{self.model} rejected native tools ({getattr(exc, 'status_code', '?')}); "
+                          f"retrying with {WANDB_FALLBACK_MODEL}")
+                    self.switched_from, self.model = self.model, WANDB_FALLBACK_MODEL
+                    return self.chat(messages, tools)
+                print(f"model rejected native tools ({getattr(exc, 'status_code', '?')}); using JSON-action loop")
+                self.native = False
+        return {"role": "assistant", "content": self._create(_json_mode(messages, tools)).choices[0].message.content or ""}
+
+    def tool_result(self, call_id, name, content):
+        if self.native and call_id:
+            return {"role": "tool", "tool_call_id": call_id, "content": content}
+        return {"role": "user", "content": f"Result of {name}: {content}"}
+
+
+JSON_RULES = ("You can call these tools: {specs}\n"
+              "To call a tool, reply with ONLY a JSON object: {{\"name\": <tool>, \"arguments\": {{...}}}}. "
+              "After you get the results, reply with the final answer as plain text (no JSON).")
+
+
+def _json_mode(messages, tools):
+    """Rewrite a native tool-calling history for a model without `tools` support."""
+    specs = json.dumps([t["function"] for t in tools])
+    out = []
+    for m in messages:
+        if m["role"] == "system":
+            out.append({"role": "system", "content": m["content"] + "\n" + JSON_RULES.format(specs=specs)})
+        elif m["role"] == "tool":
+            out.append({"role": "user", "content": f"Tool result: {m['content']}"})
+        elif m["role"] == "assistant" and m.get("tool_calls"):
+            tc = m["tool_calls"][0]["function"]
+            args = tc["arguments"] if isinstance(tc["arguments"], str) else json.dumps(tc["arguments"])
+            try:
+                args = json.loads(args or "{}")
+            except ValueError:
+                args = {}
+            out.append({"role": "assistant", "content": json.dumps({"name": tc["name"], "arguments": args})})
+        else:
+            out.append({"role": m["role"], "content": m.get("content") or ""})
+    return out
 
 
 def _json_action(text):
@@ -205,11 +318,11 @@ def summarize(name, res):
     return json.dumps(res)[:300]
 
 
-def run_agent(ollama, model, tools, question, max_steps=6):
+def run_agent(llm, tools, question, max_steps=6):
     messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": question}]
     calls, answer = [], None
     for _ in range(max_steps):
-        msg = chat(ollama, model, messages, TOOL_SPECS)
+        msg = llm.chat(messages, TOOL_SPECS)
         tcs = msg.get("tool_calls") or []
         if not tcs:
             act = _json_action(msg.get("content"))
@@ -219,15 +332,23 @@ def run_agent(ollama, model, tools, question, max_steps=6):
         if not tcs:
             answer = (msg.get("content") or "").strip() or "(empty reply from the model)"
             break
-        messages.append({"role": "assistant", "content": msg.get("content") or "", "tool_calls": tcs})
+        if isinstance(llm, WandbLLM) and any(tc.get("id") is None for tc in tcs):
+            # JSON action written as text: keep it as text in the history (there is no tool_call id to answer)
+            messages.append({"role": "assistant", "content": msg.get("content") or json.dumps(
+                {"name": tcs[0]["function"]["name"], "arguments": tcs[0]["function"]["arguments"]})})
+        else:
+            messages.append({"role": "assistant", "content": msg.get("content") or "", "tool_calls": tcs})
         for tc in tcs:
             name = tc["function"]["name"]
             args = tc["function"].get("arguments") or {}
             if isinstance(args, str):
-                args = json.loads(args or "{}")
+                try:
+                    args = json.loads(args or "{}")
+                except ValueError:
+                    args = {}
             res = tools.call(name, args)
             calls.append({"name": name, "args": args, "summary": summarize(name, res), "result": res})
-            messages.append({"role": "tool", "content": json.dumps(res, default=str)[:6000], "tool_name": name})
+            messages.append(llm.tool_result(tc.get("id"), name, json.dumps(res, default=str)[:6000]))
     if answer is None:
         answer = "(no final answer within the step limit)"
     return calls, answer
@@ -285,15 +406,15 @@ def check_task4(api, calls, answer):
     return f"{len(rows)} spaces within 2 km of central London", bool(declined and not invented and not rows)
 
 
-def check_task5(api, calls, answer, space_id):
+def check_task5(api, calls, answer, space_id, by="agent"):
     ov = [c for c in calls if c["name"] == "overrule"]
     rec = api.get(f"/api/receipt/{space_id}")
-    rows = [o for o in rec["overrules"] if o.get("by") == "agent" and "user report via agent" in (o.get("note") or "")]
+    rows = [o for o in rec["overrules"] if o.get("by") == by and "user report via agent" in (o.get("note") or "")]
     called_ok = len(ov) == 1 and ov[0]["args"].get("space_id") == space_id and ov[0]["args"].get("state") == "occupied"
     stored = rows[-1] if rows else None
     exp = (f"overrule row stored: {stored.get('overrule_id')} new_state={stored.get('new_state')} by={stored.get('by')} "
            f"note={stored.get('note')!r} at {stored.get('at')}; receipt state now {rec['space']['state']}"
-           if stored else "no overrule row by=agent found")
+           if stored else f"no overrule row by={by!r} found")
     return exp, bool(called_ok and stored and stored.get("new_state") == "occupied")
 
 
@@ -301,14 +422,25 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default="http://localhost:18001")
     ap.add_argument("--ollama", default="http://localhost:11434")
-    ap.add_argument("--model", default="gemma4:e4b")
+    ap.add_argument("--llm", choices=("ollama", "wandb"), default="ollama")
+    ap.add_argument("--model", default=None,
+                    help=f"model id (default: gemma4:e4b for ollama; for wandb, env WANDB_AGENT_MODEL or "
+                         f"{WANDB_DEFAULT_MODEL}, falling back to {WANDB_FALLBACK_MODEL} if tools are rejected)")
     ap.add_argument("--tasks", default="1,2,3,4,5")
+    ap.add_argument("--out", default=str(OUT), help="transcript path")
+    ap.add_argument("--dry-run-tools", action="store_true",
+                    help="call each read-only tool once against --base, no LLM, no writes")
     a = ap.parse_args()
-    api, tools = Api(a.base), Tools(Api(a.base))
+    if a.dry_run_tools:
+        return dry_run_tools(a.base)
+    a.model = a.model or ((_env("WANDB_AGENT_MODEL") or WANDB_DEFAULT_MODEL) if a.llm == "wandb" else "gemma4:e4b")
+    by = "agent (W&B Inference)" if a.llm == "wandb" else "agent"
+    llm = WandbLLM(a.model) if a.llm == "wandb" else OllamaLLM(a.ollama, a.model)
+    api, tools = Api(a.base), Tools(Api(a.base), by=by)
     which = {int(x) for x in a.tasks.split(",")}
     health = api.get("/api/health")
     lines = [f"# Second agent run on live data", "",
-             f"- Model: {a.model} via Ollama (tool calling through /api/chat `tools`), temperature 0",
+             f"- Model: {a.model} via {llm.label}, temperature 0",
              f"- App: {a.base} (backend `{health.get('backend')}`, kerb_spaces {health.get('db_counts', {}).get('kerb_spaces')})",
              f"- Tools: find_free_space, get_receipt, overrule (the MCP tools in query/mcp_server.py, over HTTP), "
              f"plus count_spaces (GET /api/spaces with a street filter)",
@@ -341,7 +473,7 @@ def main():
             continue
         t0 = time.time()
         tools.allow_write = False
-        calls, answer = run_agent(a.ollama, a.model, tools, tasks[n])
+        calls, answer = run_agent(llm, tools, tasks[n])
         if n == 1:
             exp, ok = check_task1(api, calls, answer)
             f = truth_free(api, 43.6527, -79.4010, 300)
@@ -360,17 +492,50 @@ def main():
              f"Use the note \"user report via agent\".")
         t0 = time.time()
         tools.allow_write = True
-        calls, answer = run_agent(a.ollama, a.model, tools, q)
+        calls, answer = run_agent(llm, tools, q)
         tools.allow_write = False
-        exp, ok = check_task5(api, calls, answer, sid)
+        exp, ok = check_task5(api, calls, answer, sid, by=by)
         record(5, q, calls, answer, exp, ok, time.time() - t0)
 
     passed = sum(results.values())
+    lines[2] = f"- Model: {llm.model} via {llm.label}, temperature 0"  # the W&B mode may have switched mid-run
     lines[7:7] = [f"**Result: {passed}/{len(results)} tasks pass.**", ""]
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text("\n".join(lines), encoding="utf-8")
-    print(f"{passed}/{len(results)} pass -> {OUT}")
+    out = Path(a.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("\n".join(lines), encoding="utf-8")
+    print(f"{passed}/{len(results)} pass -> {out}")
+
+
+def dry_run_tools(base):
+    """Exercise the tool layer against a running app with no LLM and no writes."""
+    api = Api(base)
+    tools = Tools(api)
+    h = api.get("/api/health")
+    print(f"health: backend={h.get('backend')} kerb_spaces={h.get('db_counts', {}).get('kerb_spaces')}")
+    ok = True
+    r1 = tools.call("find_free_space", {"lat": 43.6527, "lon": -79.4010, "radius_m": 300})
+    print("find_free_space ->", summarize("find_free_space", r1))
+    sid = (r1.get("free") or [{}])[0].get("space_id")
+    if not sid:
+        r = api.get("/api/spaces", lat=43.6527, lon=-79.4010, radius_m=1000, limit=1)["spaces"]
+        sid = r[0]["space_id"] if r else None
+    if sid:
+        r2 = tools.call("get_receipt", {"space_id": sid})
+        print("get_receipt ->", summarize("get_receipt", r2))
+        ok &= "error" not in r2
+    else:
+        print("get_receipt -> skipped (no space near the test point)")
+        ok = False
+    r3 = tools.call("count_spaces", {"street": "Augusta Ave", "state": "occupied"})
+    print("count_spaces ->", summarize("count_spaces", r3))
+    r4 = tools.call("find_free_space", {"lat": 51.5072, "lon": -0.1276, "radius_m": 2000})
+    print("find_free_space (London) ->", summarize("find_free_space", r4))
+    r5 = tools.call("overrule", {"space_id": sid or "x", "state": "occupied", "note": "dry run"})
+    print("overrule (writes disabled) ->", r5)
+    ok &= "error" not in r1 and "error" not in r3 and r4.get("spaces_seen") == 0 and "error" in r5
+    print("TOOL LAYER DRY RUN:", "PASS" if ok else "FAIL")
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
