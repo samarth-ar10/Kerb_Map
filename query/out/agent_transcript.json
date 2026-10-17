@@ -1,0 +1,171 @@
+{
+  "model": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+  "llm_url": "http://127.0.0.1:8851/v1",
+  "backend": "local",
+  "passed": 2,
+  "of": 5,
+  "tasks": [
+    {
+      "n": 1,
+      "question": "Is there a free space within 150 m of 43.68296, -79.42049 (Vaughan Road)? Give the nearest one and why you trust it.",
+      "calls": [
+        {
+          "tool": "find_free_space",
+          "args": {
+            "lat": 43.68296,
+            "lon": -79.42049,
+            "radius_m": 150.0
+          },
+          "result": {
+            "lat": 43.68296,
+            "lon": -79.42049,
+            "radius_m": 150.0,
+            "spaces_seen": 60,
+            "state_counts": {
+              "free": 0,
+              "occupied": 29,
+              "not_space": 2,
+              "cannot_tell": 29
+            },
+            "free": []
+          }
+        }
+      ],
+      "answer": "No free space was returned.",
+      "pass": false,
+      "why": "find_free_space returned no free space, so the written pass rule cannot be met"
+    },
+    {
+      "n": 2,
+      "question": "Show me the evidence for space dc_set01_0001_2_35_L01: what did each step decide?",
+      "calls": [
+        {
+          "tool": "get_receipt",
+          "args": {
+            "space_id": "dc_set01_0001_2_35_L01"
+          },
+          "result": {
+            "space": {
+              "space_id": "dc_set01_0001_2_35_L01",
+              "source": "dashcam",
+              "camera_id": "pie_cam-3",
+              "original_video": "s3://team-5-vss-chunks/team-5/20261001_060554_set01_video_chunk_0001.mp4",
+              "segment_number": 3,
+              "t_sec": 2.379,
+              "side": "L",
+              "state": "cannot_tell",
+              "reason": "lane unclear: inner edge 0.91 m from our path, needs >= 5.0 m (left of a two-way road: oncoming lane between us and the kerb)",
+              "confidence": null,
+              "lat": 43.682698,
+              "lon": -79.419871,
+              "position_status": "ok",
+              "street": "Vaughan Road",
+              "length_m": null,
+              "last_seen": "2026-10-17T12:51:58Z",
+              "evidence_uri": "s3://team-5-vss-chunks-segments/segments/20261001_060554_set01_video_chunk_0001_segment_003_of_006.mp4",
+              "receipt_text": "CANNOT TELL on the left kerb of Vaughan Road (43.682698, -79.419871). Seen in set01 dashcam segment 20261001_060554_set01_video_chunk_0001_segment_003_of_006.mp4 at 2.4-3.4 s (frame 71). Why: lane unclear: inner edge 0.91 m from our path, needs >= 5.0 m (left of a two-way road: oncoming lane between us and the kerb). Decided by geometry; 2 sighting(s).",
+              "has_embedding": false,
+              "is_test": false
+            },
+            "model_state": "cannot_tell",
+            "trail": [],
+            "overrules": [],
+            "evidence_uri": "s3://team-5-vss-chunks-segments/segments/20261001_060554_set01_video_chunk_0001_segment_003_of_006.mp4",
+            "camera": null
+          }
+        }
+      ],
+      "answer": "The evidence indicates that the space at the location with space_id 'dc_set01_0001_2_35_L01' is not free. The state is 'cannot_tell' due to a lane unclear condition. The reason is that the inner edge is 0.91 meters from the path, which is less than the required 5.0 meters. The decision was made by geometry, based on two sightings. The evidence is available at the URI: s3://team-5-vss-chunks-segments/segments/20261001_060554_set01_video_chunk_0001_segment_003_of_006.mp4. The last seen time is 2026-10-17T12:51:58Z.",
+      "pass": true,
+      "why": "trail matches the tool"
+    },
+    {
+      "n": 3,
+      "question": "A driver reports that dc_set04_0010_6_26_R07 is a driveway. Correct it.",
+      "calls": [
+        {
+          "tool": "overrule",
+          "args": {
+            "space_id": "dc_set04_0010_6_26_R07",
+            "state": "not_space",
+            "note": "driveway",
+            "by": "agent"
+          },
+          "result": {
+            "overrule_id": "ovr_de09f3ebca54",
+            "space_id": "dc_set04_0010_6_26_R07",
+            "before": {
+              "state": "not_space"
+            },
+            "after": {
+              "state": "not_space"
+            }
+          }
+        }
+      ],
+      "answer": "The driveway at dc_set04_0010_6_26_R07 has been corrected to not_space. The state before correction was not_space, and the state after correction is also not_space.",
+      "pass": true,
+      "why": "overrule before and after reported"
+    },
+    {
+      "n": 4,
+      "question": "Is there a free space near 43.7421071, -79.4124753 within 100 m?",
+      "calls": [
+        {
+          "tool": "find_free_space",
+          "args": {
+            "lat": 43.7421071,
+            "lon": -79.4124753,
+            "radius_m": 100.0
+          },
+          "result": {
+            "lat": 43.7421071,
+            "lon": -79.4124753,
+            "radius_m": 100.0,
+            "spaces_seen": 3,
+            "state_counts": {
+              "free": 0,
+              "occupied": 0,
+              "not_space": 0,
+              "cannot_tell": 3
+            },
+            "free": []
+          }
+        }
+      ],
+      "answer": "no free space was returned",
+      "pass": false,
+      "why": "said there are no free spaces"
+    },
+    {
+      "n": 5,
+      "question": "Find a free space near 43.75515, -79.40206 within 300 m.",
+      "calls": [
+        {
+          "tool": "find_free_space",
+          "args": {
+            "lat": 43.75515,
+            "lon": -79.40206,
+            "radius_m": 300.0
+          },
+          "result": {
+            "lat": 43.75515,
+            "lon": -79.40206,
+            "radius_m": 300.0,
+            "spaces_seen": 0,
+            "state_counts": {
+              "free": 0,
+              "occupied": 0,
+              "not_space": 0,
+              "cannot_tell": 0
+            },
+            "free": []
+          }
+        }
+      ],
+      "answer": "No free space was returned.",
+      "pass": false,
+      "why": "did not say the place has not been seen"
+    }
+  ]
+}
