@@ -120,3 +120,29 @@ From `streetcam/out/nyc/occupancy_summary.json`: clip `20261006_171812` is 6694 
 Drawings: `streetcam/kerb_sf.json`, `streetcam/kerb_nyc.json`, with `frame_sf.jpg`, `frame_nyc.jpg`, `kerb_sf_overlay.jpg` and `kerb_nyc_overlay.jpg`. Legality on those stretches is unknown, so an empty window is state `free` with reason `legality unknown`. Neighborhood receipt rows follow the occupancy fix above: near stretch 6.172 m, far stretch 17.165 m. A window with parked track ids is `occupied`; an empty neighborhood window is `free` with reason `no parked car on the hand-marked legal stretch`. Of the 308 neighborhood rows, 81 are occupied (17 on 20260901, 64 on 20260902) and 227 are free.
 
 Receipt rows (`streetcam/out/kerb_spaces.jsonl`): neighborhood 308, SF 180, NYC 360, all `source=streetcam`, `side=view`, `position_status=uncertain`. Each row has `original_video`, `segment_number`, `t_sec`, `receipt_text` and a plate-blurred `evidence_uri` (one frame per chunk). Trail steps are `boxes`, `track` and `rule` (2544 rows).
+
+
+## Map positions
+
+`streetcam/geo.py` fits a homography from image pixels to local east/north metres. `position_status` is `ok` only when a held-out OpenStreetMap point comes back under 2 m. Reference points are zebra kerb-ends from OSM, not guessed corners.
+
+`data/video_geo.csv` (same figures as `~/Desktop/builder-b-pack/extra/video_geo.csv`):
+
+| Camera | lat, lon in the CSV | geo_source |
+|---|---|---|
+| neighborhood_cam-1 | empty | unknown |
+| sf_streets_cam-5 | 37.798, -122.40666 (the Condor Club node) | landmark_estimate, about 75 m |
+| nyc_streets_cam-1 | 40.71878, -74.00255 (401 Broadway) | landmark_estimate, about 75 m |
+
+neighborhood_cam-1 has no latitude. Its 308 space rows stay `lat`/`lon` null, `position_status` uncertain, street `unknown (private neighbourhood camera)`. They are not drawn on a map.
+
+San Francisco: four fit points and held-out node 6514737762 (centre of the zebra across Broadway). Check error 20.84 m. The projected curbs were not used. The 180 space rows stay on the Condor Club point, `position_status` uncertain.
+
+New York: four kerb corners of the Broadway/Walker crossing, held-out node 8307641759. Check error 3.33 m, so `position_status` is uncertain (the bar is 2 m). The 360 space rows now sit on the projected curb rather than the single CSV point:
+
+| Stretch | lat, lon | street | map length |
+|---|---|---|---|
+| right_curb | 40.718552, -74.002394 | Walker Street | 4.639 m |
+| left_curb | 40.718682, -74.002490 | Broadway | 13.236 m |
+
+`streetcam/out/kerb_cameras.jsonl` has one row per camera. `streetcam/out/geo_fit.json` has the check errors. Each space has a trail step `position`.
