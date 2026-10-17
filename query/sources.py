@@ -3,7 +3,8 @@
 Files: <repo>/dashcam/out/*.jsonl and <repo>/streetcam/out/*.jsonl (override with KERB_JSONL_DIRS,
 a list separated by os.pathsep). Which table a line belongs to:
   1. a "table" field on the line ({"table": "kerb_spaces", "space_id": ..., ...}), else
-  2. the file name: kerb_spaces.jsonl, kerb_trail_set01.jsonl, ... (longest table-name prefix wins).
+  2. the file name. The table name is the whole stem, a prefix (kerb_trail_set01.jsonl),
+     or a suffix (set01_kerb_spaces.jsonl). The longest table name wins.
 Lines are validated against common.kerb_schema; bad lines are skipped and counted, never fixed up.
 """
 
@@ -25,8 +26,9 @@ def jsonl_dirs():
 
 def _table_from_name(path):
     base = os.path.basename(path)
+    stem = base[:-6] if base.endswith(".jsonl") else base
     for name in sorted(TABLES, key=len, reverse=True):
-        if base.startswith(name):
+        if stem == name or stem.startswith(name + "_") or stem.endswith("_" + name):
             return name
     return None
 

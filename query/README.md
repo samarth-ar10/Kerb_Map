@@ -13,7 +13,7 @@ bash query/rehearse_deploy.sh                            # deploy rehearsal, see
 
 Data: rows from the database (`common.kerbdb`, `KERB_DB=local|vastdb`) plus the builders' JSONL fallbacks in
 `dashcam/out/*.jsonl` and `streetcam/out/*.jsonl` (or `KERB_JSONL_DIRS`). A JSONL line is one table row; the table
-comes from a `"table"` field or the file name (`kerb_spaces.jsonl`, `kerb_trail_set01.jsonl`, ...). Bad lines are
+comes from a `"table"` field or the file name (`kerb_spaces.jsonl`, `kerb_trail_set01.jsonl`, `set01_kerb_spaces.jsonl`). Bad lines are
 skipped and counted in `api/health`. On the same key the database row wins.
 
 Evidence drawing: a trail step's `detail_json` may carry `"box": [x1, y1, x2, y2]` or `"point": [x, y]` in frame

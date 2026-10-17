@@ -1,8 +1,8 @@
 # Agent evaluation: five tasks for a second agent using the Kerb Map MCP tools
 
 Server: `KERB_DB=local python -m query.mcp_server` (stdio). Tools: `find_free_space(lat, lon, radius_m)`,
-`get_receipt(space_id)`, `overrule(space_id, state, note, by)`. No live LLM has been run against these yet; the tasks
-and pass rules are written down first so the run can be scored without moving the goalposts.
+`get_receipt(space_id)`, `overrule(space_id, state, note, by)`. The pass rules below were written before the run. A live run of `python -m query.second_agent`
+is saved in `query/out/agent_transcript.json` (the model, each tool call, the answer, and pass or fail).
 
 Each task is run on the real receipts once they are in the tables (not on TEST rows). Record per task: the tool calls
 made, the final answer, pass/fail by the rule below, and the receipt ids cited.
