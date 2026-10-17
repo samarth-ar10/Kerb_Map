@@ -9,43 +9,477 @@
     "width": 2048,
     "height": 1154
   },
-  "notes": "Polygons are in detection-image pixels (width 2048, height 1154), hand fit on this frame. The same camera is fixed, so both capture days use this drawing. Yellow/near and green/far bands are the kerb strips. Red and orange are driveways. The lane is the asphalt between the kerbs.",
+  "notes": "Redrawn 2026-10-17 from the image geometry of frame_neighborhood.jpg (curb lines read off a gridded zoom of the road), not fitted to labels. Pixels are detection-image pixels (2048x1154); the camera is fixed and the same framing holds on the night day. far: from 12 px behind the far curb line to 62-65 px in front of it (about 3 m of carriageway), from the tree edge x=430 to the side-road corner x=1085. near: from 45 px into the road to 8 px past the near curb line, x=430 to the grass verge end x=1300. lane: the rest of the carriageway between the strips, the side-road mouth, the bend to the right behind the fence, and the road strip left of the tree. Driveways left/right as before, plus camera_house (driveway at the bottom of the frame). Every box bottom centre is assigned to exactly one area in this priority: driveway, kerb strip, lane, else off_street. Along-kerb scale per vertex (px_per_m_vertices) is the median car box width in that 100 px column of the road divided by an assumed 4.5 m car length.",
   "kerb_strips": [
     {
       "id": "near",
-      "polygon": [[760, 785], [880, 805], [1000, 835], [1060, 825], [1060, 868], [1000, 878], [880, 848], [760, 828]]
+      "polygon": [
+        [
+          430,
+          805
+        ],
+        [
+          600,
+          785
+        ],
+        [
+          760,
+          767
+        ],
+        [
+          880,
+          750
+        ],
+        [
+          1000,
+          727
+        ],
+        [
+          1060,
+          712
+        ],
+        [
+          1200,
+          697
+        ],
+        [
+          1300,
+          691
+        ],
+        [
+          1300,
+          744
+        ],
+        [
+          1200,
+          750
+        ],
+        [
+          1060,
+          765
+        ],
+        [
+          1000,
+          780
+        ],
+        [
+          880,
+          803
+        ],
+        [
+          760,
+          820
+        ],
+        [
+          600,
+          838
+        ],
+        [
+          430,
+          858
+        ]
+      ],
+      "centerline": [
+        [
+          430,
+          832
+        ],
+        [
+          600,
+          812
+        ],
+        [
+          760,
+          794
+        ],
+        [
+          880,
+          777
+        ],
+        [
+          1000,
+          754
+        ],
+        [
+          1060,
+          739
+        ],
+        [
+          1200,
+          724
+        ],
+        [
+          1300,
+          718
+        ]
+      ],
+      "px_per_m_vertices": [
+        60,
+        58,
+        55,
+        50,
+        47,
+        45,
+        41,
+        38
+      ],
+      "px_per_m": 49.532
     },
     {
       "id": "far",
-      "polygon": [[700, 710], [880, 678], [1000, 655], [1150, 632], [1280, 680], [1280, 715], [1150, 672], [1000, 695], [880, 718], [700, 750]]
+      "polygon": [
+        [
+          430,
+          685
+        ],
+        [
+          560,
+          671
+        ],
+        [
+          710,
+          653
+        ],
+        [
+          830,
+          636
+        ],
+        [
+          960,
+          619
+        ],
+        [
+          1085,
+          601
+        ],
+        [
+          1085,
+          675
+        ],
+        [
+          960,
+          693
+        ],
+        [
+          830,
+          710
+        ],
+        [
+          710,
+          730
+        ],
+        [
+          560,
+          748
+        ],
+        [
+          430,
+          762
+        ]
+      ],
+      "centerline": [
+        [
+          430,
+          723
+        ],
+        [
+          560,
+          709
+        ],
+        [
+          710,
+          691
+        ],
+        [
+          830,
+          674
+        ],
+        [
+          960,
+          657
+        ],
+        [
+          1085,
+          639
+        ]
+      ],
+      "px_per_m_vertices": [
+        55,
+        55,
+        42,
+        34,
+        32,
+        24
+      ],
+      "px_per_m": 38.475
     }
   ],
   "legal_stretches": [
     {
       "id": "near_between_driveways",
       "kerb_id": "near",
-      "centerline": [[760, 806], [880, 826], [1000, 856], [1060, 846]],
-      "px_per_m": 59.375
+      "centerline": [
+        [
+          760,
+          794
+        ],
+        [
+          880,
+          777
+        ],
+        [
+          1000,
+          754
+        ],
+        [
+          1060,
+          739
+        ]
+      ],
+      "px_per_m_vertices": [
+        55,
+        50,
+        47,
+        45
+      ],
+      "px_per_m": 49.451
     },
     {
       "id": "far_curb",
       "kerb_id": "far",
-      "centerline": [[700, 730], [880, 698], [1000, 675], [1150, 652], [1280, 697]],
-      "px_per_m": 27.13
+      "centerline": [
+        [
+          430,
+          723
+        ],
+        [
+          560,
+          709
+        ],
+        [
+          710,
+          691
+        ],
+        [
+          830,
+          674
+        ],
+        [
+          960,
+          657
+        ],
+        [
+          1085,
+          639
+        ]
+      ],
+      "px_per_m_vertices": [
+        55,
+        55,
+        42,
+        34,
+        32,
+        24
+      ],
+      "px_per_m": 38.475
     }
   ],
   "driveways": [
     {
       "id": "left",
-      "polygon": [[400, 860], [790, 900], [810, 1100], [370, 1110]]
+      "polygon": [
+        [
+          400,
+          860
+        ],
+        [
+          790,
+          900
+        ],
+        [
+          810,
+          1100
+        ],
+        [
+          370,
+          1110
+        ]
+      ]
     },
     {
       "id": "right",
-      "polygon": [[1120, 820], [1500, 790], [1520, 1060], [1100, 1080]]
+      "polygon": [
+        [
+          1120,
+          820
+        ],
+        [
+          1500,
+          790
+        ],
+        [
+          1520,
+          1060
+        ],
+        [
+          1100,
+          1080
+        ]
+      ]
+    },
+    {
+      "id": "camera_house",
+      "polygon": [
+        [
+          700,
+          1112
+        ],
+        [
+          812,
+          1102
+        ],
+        [
+          1100,
+          1082
+        ],
+        [
+          1520,
+          1062
+        ],
+        [
+          1520,
+          1154
+        ],
+        [
+          700,
+          1154
+        ]
+      ]
     }
   ],
   "lane": {
-    "polygon": [[420, 700], [1360, 690], [1280, 780], [1040, 820], [780, 800], [450, 780], [420, 740]]
+    "polygon": [
+      [
+        0,
+        680
+      ],
+      [
+        430,
+        680
+      ],
+      [
+        430,
+        762
+      ],
+      [
+        560,
+        748
+      ],
+      [
+        710,
+        730
+      ],
+      [
+        830,
+        710
+      ],
+      [
+        960,
+        693
+      ],
+      [
+        1085,
+        675
+      ],
+      [
+        1085,
+        601
+      ],
+      [
+        1085,
+        555
+      ],
+      [
+        1270,
+        555
+      ],
+      [
+        1270,
+        600
+      ],
+      [
+        1450,
+        628
+      ],
+      [
+        1650,
+        662
+      ],
+      [
+        1850,
+        688
+      ],
+      [
+        2048,
+        700
+      ],
+      [
+        2048,
+        752
+      ],
+      [
+        1300,
+        744
+      ],
+      [
+        1300,
+        691
+      ],
+      [
+        1200,
+        697
+      ],
+      [
+        1060,
+        712
+      ],
+      [
+        1000,
+        727
+      ],
+      [
+        880,
+        750
+      ],
+      [
+        760,
+        767
+      ],
+      [
+        600,
+        785
+      ],
+      [
+        430,
+        805
+      ],
+      [
+        430,
+        858
+      ],
+      [
+        400,
+        862
+      ],
+      [
+        383,
+        1000
+      ],
+      [
+        0,
+        1000
+      ]
+    ]
   },
   "free_gap_m": 5.5,
   "still_s": 120,
@@ -73,6 +507,28 @@
       "assumed_m": null,
       "px_per_m": 27.13,
       "used_for": "far-kerb along-street scale = near scale times 95/208"
+    },
+    {
+      "id": "along_kerb_scale_from_car_widths",
+      "what": "median car box width per 100 px x column, far and near halves of the road, both days",
+      "pixels": null,
+      "assumed_m": 4.5,
+      "px_per_m": null,
+      "used_for": "px_per_m_vertices on the kerb centrelines"
     }
-  ]
+  ],
+  "occupancy": {
+    "cell_m": 1.0,
+    "window_s": 120,
+    "min_fraction": 0.6,
+    "stitch_gap_s": 3.0,
+    "stitch_px": 30,
+    "parked_overlap_s": 120,
+    "vehicle_labels": [
+      "car",
+      "truck",
+      "bus",
+      "motorcycle"
+    ]
+  }
 }

@@ -52,7 +52,7 @@ img.onload = async () => {
   for (const d of kerb.driveways) draw(d.polygon, COLORS.driveway, "driveway " + d.id);
   const legend = document.getElementById("legend");
   legend.textContent = kerb.frame.filename + "  frame " + kerb.frame.frame_index
-    + "  ·  near kerb, far kerb, two driveways, lane";
+    + "  ·  near kerb, far kerb, driveways, lane";
 };
 </script>
 </body>
