@@ -146,3 +146,7 @@ New York: four kerb corners of the Broadway/Walker crossing, held-out node 83076
 | left_curb | 40.718682, -74.002490 | Broadway | 13.236 m |
 
 `streetcam/out/kerb_cameras.jsonl` has one row per camera. `streetcam/out/geo_fit.json` has the check errors. Each space has a trail step `position`.
+
+## New York homography, second pass
+
+The west sidewalk edge on `frame_nyc.jpg` was measured again: for x=70 to x=210 the asphalt starts at y=663 to y=668. Moving the south-west fit point onto that edge raised the held-out error from 3.33 m to 4.45 m. Three other pixel sets scored 6.09 m, 5.86 m and 2.95 m (`streetcam/out/geo_nyc_refine.json`). None is under 2 m, so the original points and the uncertain New York coordinates are unchanged.
