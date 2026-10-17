@@ -1,0 +1,278 @@
+{
+ "camera_hours": {
+  "value": 1.5,
+  "source": "1,080 segments x 5 s, pie_cam-3, set01-set06 (dashcam/RESULTS.md)"
+ },
+ "cost_per_camera_hour": {
+  "keyframes_kept": {
+   "value": 1800.7,
+   "total": 2701,
+   "of_frames": 162000,
+   "source": "out/work/<set>_stats.json (keyframes, frames_in_drive)"
+  },
+  "yolo_boxes_stored_all_frames": {
+   "value": 811468.7,
+   "total": 1217203,
+   "source": "count of detections in the 1,080 stored detection files (bystander-data/dashcam-det), not recomputed"
+  },
+  "yolo_boxes_read_at_keyframes_all_classes": {
+   "value": 11139.3,
+   "total": 16709,
+   "source": "stored detections at the 2,701 keyframes"
+  },
+  "yolo_vehicle_boxes_used": {
+   "value": 7520.7,
+   "total": 11281,
+   "source": "car/truck/bus >= 0.4 at keyframes"
+  },
+  "slots": {
+   "value": 5230.7,
+   "total": 7846
+  },
+  "cosmos_calls": {
+   "value": 2.67,
+   "total": 4,
+   "source": "kerb_trail cosmos steps (4 dc_ rows) and stats cosmos_calls"
+  },
+  "cosmos_seconds_uncached": {
+   "value": 13.0,
+   "total": 19.5,
+   "per_call_s": [
+    4.81,
+    4.99,
+    4.88,
+    4.82
+   ],
+   "source": "first-run uncached call means, dashcam/RESULTS.md (local Cosmos-Reason1-7B Q4, team laptop)"
+  },
+  "cosmos_seconds_cached_trail": {
+   "per_call_s": [
+    0.42,
+    0.33,
+    0.35,
+    0.1
+   ],
+   "source": "kerb_trail cosmos step 'seconds' (final rerun hit the prompt cache)"
+  },
+  "wall_time_per_30s_clip_s": {
+   "value": 1.64,
+   "parts_s_per_clip": {
+    "fetch_detections": 1.31,
+    "keyframes_to_rules_position": 0.029,
+    "cosmos_uncached": 0.108,
+    "write_sqlite_jsonl": 0.2
+   },
+   "clips": 180,
+   "source": "stage timings in dashcam/RESULTS.md (235 s fetch, 5.2 s slots, 36 s write) + uncached Cosmos seconds; 180 clips of 30 s"
+  }
+ },
+ "baseline": {
+  "name": "Cosmos on every 5-second segment",
+  "calls_per_camera_hour": 720,
+  "seconds_per_call": 4.875,
+  "seconds_per_call_source": "mean of the 4 uncached first-run means (4.81-4.99 s), team laptop; event endpoint timing not measured (no timing in out/cosmos_probe.json)",
+  "cosmos_seconds_per_camera_hour": 3510.0,
+  "ratio_calls": 270.0,
+  "ratio_seconds": 270.0
+ },
+ "latency_clip_to_receipt_s": {
+  "measured_local_s": 0.23,
+  "parts": {
+   "s_detections_to_slots": 0.17,
+   "s_cosmos_stage": 0.05,
+   "s_dedupe_receipts": 0.02
+  },
+  "clip": "set05 chunk 0024 (6 segments, 30 s)",
+  "slots": 67,
+  "receipts": 34,
+  "receipts_by_state": {
+   "cannot_tell": 9,
+   "occupied": 22,
+   "not_space": 2,
+   "free": 1
+  },
+  "cosmos_calls": 0,
+  "not_in_measured": {
+   "fetch_detections_s_derived": 1.31,
+   "cosmos_uncached_s_if_one_gap_queued": 4.875,
+   "sqlite_write": "not run (would replace lab rows)",
+   "frame_cut_on_vm": "not measured"
+  },
+  "estimate_with_fetch_and_one_cosmos_call_s": 6.41,
+  "source": "run today: receipts.py stages on one chunk from stored detections to receipt JSONL (scratch); drive calibration reused; no Cosmos gap in this chunk once keyframes restart at the chunk start"
+ },
+ "cannot_tell_breakdown": {
+  "slots": 7846,
+  "by_state": {
+   "cannot_tell": 5516,
+   "occupied": 2272,
+   "not_space": 47,
+   "free": 11
+  },
+  "by_final_reason": {
+   "lane unclear (car)": 5482,
+   "lane unclear (gap behind a car of unclear lane)": 30,
+   "kerb hidden by traffic in our lane": 3,
+   "model low confidence": 1
+  },
+  "lane_unclear_cars": {
+   "trigger": {
+    "inner edge closer than the lane margin": 2925,
+    "inner edge closer than the lane margin + not in the outermost row": 1832,
+    "not in the outermost row": 725
+   },
+   "lane_margin": {
+    "5.0 m: left side of a two-way road": 3006,
+    "4.5 m: multi-lane road": 2069,
+    "1.8 m: single lane our side": 407
+   },
+   "side": {
+    "left": 3996,
+    "right": 1486
+   },
+   "shortfall_vs_margin_m": {
+    "2-3": 1347,
+    ">=3": 1200,
+    "1-2": 1171,
+    "meets margin (row test failed)": 723,
+    "0.5-1": 536,
+    "<0.5": 505
+   },
+   "box_bottom_row_px": {
+    "800-849": 1455,
+    "760-799": 1397,
+    "850-899": 1351,
+    "900-999": 1086,
+    ">=1000": 182,
+    "<760": 11
+   },
+   "box_centre_offset_px": {
+    "0-199": 2371,
+    "200-399": 1616,
+    "400-599": 719,
+    "600-799": 613,
+    ">=800": 163
+   },
+   "depth_m": {
+    "20-30": 1522,
+    "<10": 1260,
+    "15-20": 952,
+    "10-15": 892,
+    "30-39.9": 698,
+    "40 (cap)": 158
+   },
+   "speed_kmh": {
+    "15-29": 2595,
+    "30-44": 1786,
+    "5-14": 732,
+    ">=45": 214,
+    "0-4": 155
+   },
+   "parked_row_same_side_same_frame": {
+    "no": 3126,
+    "yes": 2356
+   }
+  },
+  "examples": [
+   {
+    "file": "1_dc_set02_0011_6_41_L02.jpg",
+    "item_id": "dc_set02_0011_6_41_L02",
+    "trigger": "left of two-way road, inner edge short",
+    "reason": "lane unclear: inner edge 0.94 m from our path, needs >= 5.0 m (left of a two-way road: oncoming lane between us and the kerb)"
+   },
+   {
+    "file": "2_dc_set03_0000_1_06_L02.jpg",
+    "item_id": "dc_set03_0000_1_06_L02",
+    "trigger": "multi-lane road, inner edge short",
+    "reason": "lane unclear: inner edge 5.38 m from our path, needs >= 4.5 m (multi-lane road: car could be in the next lane)"
+   },
+   {
+    "file": "3_dc_set02_0002_5_10_L02.jpg",
+    "item_id": "dc_set02_0002_5_10_L02",
+    "trigger": "single lane, inner edge short",
+    "reason": "lane unclear: inner edge 0.73 m from our path, needs >= 1.8 m (single lane our side)"
+   },
+   {
+    "file": "4_dc_set01_0006_2_12_L06.jpg",
+    "item_id": "dc_set01_0006_2_12_L06",
+    "trigger": "gap behind a car of unclear lane",
+    "reason": "lane unclear: a car of unclear lane sits in front of this gap"
+   },
+   {
+    "file": "5_dc_set04_0002_6_08_L05.jpg",
+    "item_id": "dc_set04_0002_6_08_L05",
+    "trigger": "kerb hidden by traffic",
+    "reason": "kerb hidden by traffic in our lane"
+   },
+   {
+    "file": "6_dc_set02_0005_2_13_L03.jpg",
+    "item_id": "dc_set02_0005_2_13_L03",
+    "trigger": "left of two-way road, inner edge short (second)",
+    "reason": "lane unclear: inner edge 1.13 m from our path, needs >= 5.0 m (left of a two-way road: oncoming lane between us and the kerb)"
+   }
+  ],
+  "source": "out/work/<set>_slots.json of the shipped run; re-run from stored detections reproduces every count"
+ },
+ "rule_change_before_after": {
+  "rule": "neighbouring parked row: a lane-unclear car whose outer edge is within 1.0 m of the parked row's outer edge (median) on the same side of the same frame is called parked",
+  "flag": "KERB_ROW_RULE=1 (KERB_ROW_TOL_M=1.0), branch dashcam/cannot-tell",
+  "before": {
+   "slots": 7846,
+   "slots_by_state": {
+    "occupied": 2272,
+    "cannot_tell": 5516,
+    "not_space": 47,
+    "free": 11
+   },
+   "receipts": 5110,
+   "receipts_by_state": {
+    "cannot_tell": 3345,
+    "occupied": 1710,
+    "not_space": 44,
+    "free": 11
+   },
+   "cannot_tell_reasons": {
+    "lane unclear (car)": 5482,
+    "lane unclear (gap behind a car of unclear lane)": 30,
+    "kerb hidden by traffic in our lane": 3,
+    "model low confidence": 1
+   },
+   "cosmos_calls": 4
+  },
+  "after": {
+   "slots": 7864,
+   "slots_by_state": {
+    "occupied": 2412,
+    "cannot_tell": 5378,
+    "not_space": 61,
+    "free": 13
+   },
+   "receipts": 5127,
+   "receipts_by_state": {
+    "cannot_tell": 3262,
+    "occupied": 1795,
+    "not_space": 57,
+    "free": 13
+   },
+   "cannot_tell_reasons": {
+    "lane unclear (car)": 5342,
+    "lane unclear (gap behind a car of unclear lane)": 31,
+    "frame unavailable for model": 1,
+    "kerb hidden by traffic in our lane": 3,
+    "model low confidence": 1
+   },
+   "cosmos_calls": 4
+  },
+  "slot_changes": {
+   "cannot_tell -> occupied": 140,
+   "new slot -> not_space": 17,
+   "new slot -> free": 2,
+   "new slot -> cannot_tell": 9
+  },
+  "note": "one new gap was queued for the model but has no cut frame, so it is cannot_tell (frame unavailable); Cosmos calls stay 4",
+  "label_scores": {
+   "status": "no labels",
+   "detail": "returned/ has no answers_B*.csv yet; run python dashcam/cannot_tell.py score BEFORE AFTER (tune set01-03, report set04-06)"
+  }
+ }
+}
